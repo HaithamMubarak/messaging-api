@@ -1,0 +1,6 @@
+rootProject.name = "messaging-api"
+include("services:kafka-service")
+include("agents:java-agent")
+
+
+gradle.ext.messagingApiUrl = '/messaging-api/origin-service'

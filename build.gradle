@@ -1,0 +1,59 @@
+plugins {
+    id 'base'
+}
+
+def artifactDir = layout.buildDirectory.dir("artifacts")
+
+// Pick up messagingApiUrl from command line (-P) or settings.gradle (default)
+ext {
+    messagingApiUrl = (project.findProperty("messagingApiUrl")
+            ?: (gradle.ext.has("messagingApiUrl") ? gradle.ext.messagingApiUrl : "/messaging-api/origin-service"))
+}
+
+// Clean artifacts
+tasks.register("cleanArtifacts") {
+    group = "build"
+    doLast {
+        delete artifactDir
+        println "Cleaned ${artifactDir.get().asFile}"
+    }
+}
+
+// Copy PHP service
+tasks.register("copyPhpService", Copy) {
+    group = "build"
+    from("services/origin-service")
+    into(artifactDir.map { it.dir("origin-service") })
+}
+
+// Copy JS agent with URL injection
+tasks.register("copyJsAgent", Copy) {
+    group = "build"
+    from("agents/web-agent") {
+        include "**/*.html"
+        include "**/*.js"
+        include "**/*.css"
+        include "images/**"
+        include "html5-components/**"
+    }
+    into(artifactDir.map { it.dir("web-agent") })
+
+    // Inject messagingApiUrl into init-agent.js
+    filesMatching("**/init-agent.js") {
+        filter { line ->
+            line.replaceAll(/window\.messagingApiUrl\s*=\s*['"].*?['"];/,
+                    "window.messagingApiUrl = '${ext.messagingApiUrl}';")
+        }
+    }
+}
+
+// Assemble both artifacts
+tasks.register("assembleArtifacts") {
+    group = "build"
+    dependsOn("copyPhpService", "copyJsAgent")
+}
+
+// Make root build depend on assemble
+tasks.named("build") {
+    dependsOn("assembleArtifacts")
+}

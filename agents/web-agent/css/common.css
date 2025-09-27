@@ -1,0 +1,73 @@
+html,body{
+	width : 99%;
+	height : 99%;
+	margin : 0;
+		background: #EBF4FB;
+}
+
+html{	
+	border : 1px solid #467792;
+	box-sizing: border-box;
+}
+body {
+	font:12px arial;
+	color: #222;
+	text-align:center;
+	position : relative;
+}
+
+.btn[disabled],.btn[disabled]:hover{
+	background-color : gray;
+	color : white;
+	background-image : none;
+	cursor : default;
+}			
+
+.btn {
+	margin-left: 10px;
+	float : left;
+	cursor : pointer;
+	background: #3498db;
+	background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
+	background-image: -moz-linear-gradient(top, #3498db, #2980b9);
+	background-image: -ms-linear-gradient(top, #3498db, #2980b9);
+	background-image: -o-linear-gradient(top, #3498db, #2980b9);
+	background-image: linear-gradient(to bottom, #3498db, #2980b9);
+	-webkit-border-radius: 28;
+	-moz-border-radius: 28;
+	border-radius: 28px;
+	font-family: Arial;
+	color: #ffffff;
+	font-size: 12px;
+	padding: 10px 20px 10px 20px;
+	text-decoration: none;
+}
+
+.btn:hover {
+	background: #3cb0fd;
+	background-image: -webkit-linear-gradient(top, #3cb0fd, #3498db);
+	background-image: -moz-linear-gradient(top, #3cb0fd, #3498db);
+	background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
+	background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
+	background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+	text-decoration: none;
+}
+
+textarea{
+	resize : none;
+}
+
+textarea:focus{
+	 outline: none;
+}
+			
+label{
+	text-align : left;
+}
+	
+.config label, .config input{
+	padding: 5px;
+    font-size: 15px;
+    padding-left: 10px;
+}	
+			

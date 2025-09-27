@@ -1,0 +1,1077 @@
+<html>
+	<head>
+		<title>HTTP Channel API</title>
+		<meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
+				
+		<script src="js/utils.js"></script>
+		
+		<script src="js/lib/jquery.js"></script>
+		
+		<link rel="stylesheet" href="css/common.css" />
+		
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/emojify.js/1.1.0/js/emojify.min.js"></script>
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/emojify.js/1.1.0/css/basic/emojify.min.css" />
+
+        <script src="js/init-agent.js"></script>
+
+		<style>
+		
+			.config input{
+				border-radius: 20px;
+				padding-left: 7px;
+				color: #467792;
+				background-color: #acd8f0;
+				outline: none;
+			}
+			
+			.config label,.config input{
+			    float: left;
+				width: 100%;
+			}
+			
+			.right-side-container, .left-side-container{
+				cursor : default;
+				width : 100%;
+				position: relative;
+			}
+			
+			.message-user{
+				color: #927878;
+				font-weight: bold;
+				position: absolute;
+				top: -20px;
+				text-align: center;
+				float: left;
+				left: 0;
+				white-space: nowrap;
+			}
+			
+			.right-side-container{
+				float: right;		
+			}
+			
+			.left-side-container{	
+				float: left;
+			}
+			
+			.left-side-container,.right-side-container{
+				margin-top : 7px;
+				margin-bottom: 7px;
+				width: 100%;
+			}
+			
+			.side-message{
+				padding : 7px;
+				margin-top: 20px;				
+				word-wrap: break-word;
+				max-width : 70%;				
+				font-size: 13px;
+				border-radius: 7px;
+				padding-left: 20px;
+				padding-right: 20px;
+				box-sizing: border-box;	
+				box-shadow: 2px 2px 2px #888888;
+			}
+			
+			.side-message div{
+				width : 100%;
+			}
+			
+			.side-message .msg-time{
+				font-size: 10px;				
+				padding-top: 10px;
+				text-align: center;
+			}
+			
+			.left-side-message .msg-time{
+				color: #9E9E9E;
+			}
+			
+			.right-side-message .msg-time{
+				color: #795548;
+			}
+			
+			.right-side-message{
+			    float: right;
+				background-color: #00BCD4;
+				margin-right: 10px;
+				min-height: 30px;
+				color : white;	
+				position: relative;
+			}
+			
+			.left-side-message{
+				background-color: #f1f0f0;
+				min-height: 30px;
+				margin-left: 10px;
+				float : left;				
+				color : black;
+				position: relative;
+			}
+			
+			#usermsg{
+			    border: none;
+				position: absolute;
+				left: 0;
+				right: 0;
+				width: 100%;
+				padding-left: 5px;
+				height: 90%;
+				padding-top: 5px;
+				overflow : auto;
+			}
+			
+			.config{
+			    margin-bottom: 10px;
+			}
+			
+			.config{
+				position  :absolute;
+				width: 90%;
+				margin: 0 auto;
+				left : 0;
+				right : 0;
+				text-align: center;
+				padding: 3px;
+				top : 0;
+				bottom: 190px;
+			}
+			
+			#wrapper{
+			    position: absolute;
+				bottom: 0;
+				overflow-y: auto;
+				overflow-x: hidden;
+				top: 190px;
+				left: 0;
+				right: 0;
+				border: 1px solid #ACD8F0;				
+	
+			}
+			
+			.connection-buttons-container{
+				padding : 10px;
+				width: 320px;
+				margin: 0 auto;
+			}
+
+			
+			#app-container {
+				text-align:left;
+				margin:0 auto;
+				padding:5px;
+				background:#fff;
+				min-height:220px;
+				min-height:220px;
+				width: 90%;
+				border:1px solid #ACD8F0;
+				overflow:auto; 
+				height: calc(100% - 220px);
+			}
+			
+			.user{
+				width: 44px;
+				height: 44px;
+				float: left;
+				border: 1px solid #888888;
+				border-radius: 22px;
+				overflow: hidden;
+			}
+			
+			.user img{
+				width : 100%;
+				height : 100%;
+			}
+			
+			.usermsg-mobile {
+				position: fixed;
+				bottom: 16px;
+				left: 0;
+				right: 0;
+				width: 93%;
+				margin: 0 auto;
+			}
+		
+			.chat-box-botton-send{
+				background: url(images/send-chat-message.png);
+			}
+			
+			.chat-box-botton-clear{
+				background: url(images/clear-chat-message.png);
+			}
+			
+			.chat-box-botton {
+				background-repeat: no-repeat;
+				background-size: 30px;
+				width: 30px;
+				height: 30px;
+				cursor : pointer;
+				background-color: #acd8f0;
+				border: 1px solid #3498db;
+				border-radius: 4px;
+				margin-bottom : 3px;
+			}
+			
+			.chat-box-botton:active{
+				background-color: #3498db;
+			}
+			
+			.send-button-container{
+				width: 33px;
+				float: right;
+			}
+			
+			.input-message-container{
+				margin: 0;
+				height: 100%;
+				position: absolute;
+				left: 0;
+				right: 45px;
+			}
+			
+			.message-box-dim{
+				width: 87%;
+				margin: 0 auto;
+			}
+			
+			.message-box{			   
+				background-color: white;
+				height: 75px;
+				position: relative;
+				border: 1px solid #3cb0fd;
+				padding: 3px;
+				box-sizing: border-box;
+			}
+			
+			.connection-info{
+				text-align: left;
+				margin-top: 3px;
+				padding: 5px;
+			}
+			
+			.clickable-text{
+				cursor : pointer;
+				text-decoration: underline;
+				color: blue;
+			}
+			
+			.notification-container{
+				position : fixed;
+				right : 30px;
+				width : 20%;
+				min-width : 200px;
+				height : auto;
+				bottom : 20px;				
+				overflow : auto;
+				z-index : 999;
+				padding : 3px;
+				box-sizing : border-box;
+				 
+			}
+			
+			.notification{
+				margin : 3px 3px 3px 3px;
+				word-wrap: break-word;
+				padding: 5px;
+				height: auto;
+				border-radius: 10px;
+				width: 98%;
+				overflow: auto;
+				background-color: rgba(76, 220, 76, 0.55);
+				border: 1px solid rgb(86, 180, 239);
+				box-shadow: 3px 3px 3px #888888;
+				box-sizing: border-box;
+				position : relative;
+			}
+			
+			.notification-close{
+			    float: right;
+				cursor: pointer;
+				position: absolute;
+				top: 3px;
+				right: 3px;
+				padding: 5px;
+			}
+			
+			.notification-close img{
+				width: 20px;
+				height: 20px;
+			}
+			
+			.connection-event{
+				text-align: center;
+				padding: 5px;
+				width: 90%;
+				margin: 0 auto;
+				/*border-top: 1px solid rgba(158, 158, 158, 0.52);
+				border-bottom: 1px solid rgba(158, 158, 158, 0.52);*/
+				padding-bottom: 5px;
+				margin-bottom: 12px;
+				margin-top: 12px;
+				position: relative;
+				overflow: hidden;
+				box-sizing: border-box;
+				height: 26px;
+			}
+			
+			.connection-event-connected{
+				color: #6baf1b;
+			}
+			
+			.connection-event-disconnected{
+				color: #9E9E9E;
+			}
+			
+			.connection-event-text{
+				display: block;
+				margin: 0 auto;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				box-sizing: border-box;
+				padding-left: 8px;
+				padding-right: 8px;
+				cursor: default;
+				position: relative;
+				z-index: 10;
+				background-color: white;				
+				min-width: 140px;
+				max-width: 200px;
+			}			
+
+			 .connection-event-line{
+				content: "";
+				position: absolute;
+				border-top: 1px solid #ACD8F0;
+				width: 100%;
+				box-sizing: border-box;
+				left: 0;
+				z-index: 0;
+				top: 12.5px;
+				
+			}
+						
+		</style>
+	</head>
+
+	<body>
+		<div class="config">
+			
+			<span id="channel-input">
+				<label>Channel Name</label>
+				<input type="text" id ="channelName" placeholder="channel name" value="default"/>			
+				<label>Channel Password</label>
+				<input type="password" id ="channelPassword" placeholder="channel password" value="default"/>
+			</span>
+			
+			<label>Nick Name</label>
+			<input type="text" id ="nickName" placeholder="your name" value=""/>
+		</div>
+				
+		<div id="wrapper">
+				
+			<div class="connection-buttons-container">
+				<!--<p class="welcome">Welcome, <b></b></p>-->
+				
+				<button class="btn" type="submit" id="start" value="Connect">Connect</button>
+				<button class="btn" type="submit" id="close" value="Close" disabled="disabled">Disconnect</button>
+				<button class="btn" type="submit" id="clear" value="Clear">Clear</button>
+				
+				<div style="clear:both"></div>
+			</div>			 
+			
+			<div id="app-container">			
+			
+			</div>
+			
+
+			<div class="message-box-dim" style="padding: 7px;text-align:left;">
+				<label id="press-enter"><input type="checkbox" name="checkbox" checked="checked">Press enter to send</label>				
+			</div>		
+			
+			<div class="message-box message-box-dim">
+					
+					<div class="input-message-container">					
+						<textarea name="usermsg" type="text" id="usermsg" placeholder="Type your message" style=""></textarea>
+					</div>					
+			
+					<div class="send-button-container">
+						<div class="chat-box-botton chat-box-botton-send" class="" id="submitmsg"></div>
+						<div class="chat-box-botton chat-box-botton-clear" id="clearmsg"></div>
+					</div>
+
+			</div>
+			
+			<div class="connection-info message-box-dim" style="display:none;">
+				<span class= "clickable-text" id="channel-text"></span> is connected with <span class="users-count clickable-text"></span> 
+			</div>
+
+		
+		</div>
+		
+		<div class="notification-container">
+			<div class="notification notification-queue" style="display : none;"></div>
+		</div>
+		
+		<script type="text/javascript">
+		
+		var channel;
+		var sending = false;
+		var messagesCount = 0;
+		var last = {date : null, type : null,user : null};
+
+		
+		
+		function uiDeactiveState(){
+		
+			$('#start,#channelName,#channelPassword,#nickName').attr('disabled',false);
+			$('#close,#submitmsg').attr('disabled',true);
+			
+			$('#channel-input').show();
+			$('#wrapper').attr('style','');	
+
+			$('.connection-info').hide();			
+		}
+		
+		function uiActiveState(){
+			$('#start,#channelName,#channelPassword,#nickName').attr('disabled',true);
+			$('#close,#submitmsg').attr('disabled',false);
+
+			$('#channel-input').hide();
+			$('#wrapper').attr('style','top: 70px;');	
+			
+			$('.connection-info').show();
+			
+			var channelInfo = channel.getChannelInfo();
+			var sessionInfo = channel.getSessionInfo();
+			
+			$('.connection-info #channel-text').html(channelInfo.name+'-'+channelInfo.id);			
+			//$('.connection-info #channel-id').text(md5($('#channelName').val())+'-'+md5($('#channelPassword').val()));
+			
+		}
+		
+		function pressEnterMode(checked){
+			//checkbox = checkbox || $(this).find('input');
+			//checkbox[0].checked
+			if(checked){
+				$('.send-button-container').attr('style','width:66px;');
+				$('.chat-box-botton').attr('style','float :left');
+				$('.message-box').attr('style','height:40px;');
+				$('.input-message-container').attr('style','right:72px');
+				$('#usermsg').attr('style','font-size:15px');
+			}else{
+				$('.send-button-container').attr('style','');
+				$('.chat-box-botton').attr('style','');
+				$('.message-box').attr('style','');
+				$('.input-message-container').attr('style','');
+				$('#usermsg').attr('style','');
+			}
+		}	
+		function send(){
+				
+			if(sending){
+				return;
+			}
+			
+			if(!channel){
+				return alert('Please connect to a channel');
+			}
+			
+			var message = $('#usermsg').val();
+
+			if(message){				
+				sending = true;
+				//$('.message-box').attr('style','background-color:#ebebe4;')
+				//$('submitmsg').attr('style','background-color:#ebebe4;');
+				//$('#usermsg').attr('disabled','disabled');
+
+				channel.sendMessage(message,function(response){
+					
+					if(response.status == 'success'){
+						addSentMessage({name : "You",img: "images/you.png"},message,new Date());
+					}else{
+						alert(response.data);
+					}		
+
+					setTimeout(function(){
+						//$('.message-box').removeAttr('style')
+						//$('submitmsg').removeAttr('style');
+						//$('#usermsg').removeAttr('disabled');
+						sending = false;
+					},500);
+				});
+						
+				/*channel.status(function(s){						
+					if(s.status == 'error'){
+						sending = false;
+						alert('No one is conencted to the channel');
+					}else{
+						channel.sendMessage(message,function(response){
+							sending = false;
+							if(response.status == 'success'){
+								addSentMessage({name : "You",img: "images/you.png"},message);
+							}else{
+								alert(response.data);
+							}								
+						});
+					}
+		
+				});*/
+			
+			}					
+		}
+		
+		function updateUsersCount(){		
+			var users = channel.connectedUsers;		
+			$('.users-count').text(users.length+ (users.length == 1?" User":" Users"));
+		}
+		
+		var notifier = {
+			audio : {
+				default : new Audio('sounds/377017__elmasmalo1__notification-pop.wav')
+			},
+			
+			playAudio : function(audio){
+			
+				audio = audio || this.audio.default;
+				
+				if(audio.paused && !audio._quite){
+					audio._quite = true;
+					setTimeout(function(){
+						audio._quite = false;
+					},1000);
+					audio.play();
+				}
+			},
+			
+			_focusList : [],
+			_blurList : [],
+			_wait : [],
+			enabled : false,
+			_active : 0,
+			maxNotification : 3,	
+			liveTime : 6000,
+			active :  false,
+			updateQueueCount : function(){
+				if(this._wait.length == 0){
+					$('.notification-queue').hide();
+				}else{
+					$('.notification-queue').text('+'+this._wait.length);
+					$('.notification-queue').show();
+				}
+				
+			},
+			show : function(title,text){
+				var _self = this;
+				
+				if(!_self.enabled){
+					return;
+				}
+				
+				if(arguments.length == 0 ){
+					if(_self._active.length >= _self.maxNotification || _self._wait.length == 0){
+						return;
+					}else{
+						var obj = _self._wait.splice(0,1)[0];
+						_self.updateQueueCount();
+						title = obj.title;
+						text = obj.text;
+						
+					}
+					
+				}else if(_self._active >= _self.maxNotification){
+					_self._wait.push({title : title,text : text});
+					_self.updateQueueCount();
+					return;
+				} 
+				
+				_self._active++;
+				
+				title = title || 'Untitled';
+				text = text || '';
+				
+				var el = $("<div class='notification'><div class='notification-close'><img src='images/close.png'/></div><h3>"+title+"</h3><p>"+text+"</p></div>");					
+				$('.notification-container').append(el);
+
+				notifier.playAudio();
+
+				var resetCounter,fadeout;
+				var closed = false;				
+				var wait = _self.liveTime;
+				var fadingOut = false;
+				
+				fadeout = function(e,isDocEvent){
+					fadingOut = true;
+					
+					console.log('fadeout() with '+wait);
+					el.fadeOut(wait,function(){
+						_self.show();
+						_self._active--;
+						el.remove();
+						
+						_self._focusList.splice(_self._focusList.indexOf(fadeout),1);
+						_self._blurList.splice(_self._blurList.indexOf(resetCounter),1);
+					});
+				}
+
+				resetCounter = function(e,fadeoutAfterReset,forceClose){
+					if((closed || !fadingOut) && !forceClose){
+						return;
+					}
+					if(forceClose){
+						closed = forceClose;
+					}
+					
+					console.log('reset() with '+fadeoutAfterReset);
+					el.stop();
+					el.css('opacity','1');					
+					fadingOut = false;
+					
+					if(fadeoutAfterReset){
+						fadeout(e);	
+					}
+
+					e.preventDefault();
+				}				
+
+				el.click(function(e){
+					e.preventDefault();
+					setTimeout(function(){
+						resetCounter(e,false);
+					},200);					
+				});
+
+				el.find('.notification-close').click(function(e){
+					console.log('close');
+					wait = 700;
+					setTimeout(function(){
+						resetCounter(e,true,true);			
+					},200);						
+				});
+
+				_self._focusList.push(fadeout);
+				_self._blurList.push(resetCounter);	
+
+				if(document.hasFocus()){
+					fadeout(null);
+				}
+			}
+		}
+	
+		$(window).focus(function(e) {
+			console.log('window click');
+			notifier._focusList.forEach(function(call){
+				call(e);
+			});
+		});
+
+		$(window).blur(function(e) {
+			console.log('window blur');
+			notifier._blurList.forEach(function(call){
+				call(e,false);
+			});
+		});
+		
+		$(document).ready(function(){
+
+			var hash = parseHashParameters();
+			
+			var email;
+			var invitation = hash.invitation;
+			var email = hash.email;
+			
+			var errorMsg = "";			
+			
+			if(email && email != null){
+				email = MySecurity.decrypt(email,'email');				
+			}
+			
+			if(!email || email == null){
+				email = localStorage['invitation-email-'+invitation];
+			}
+			
+			while(invitation){
+			
+				if(!email || email == null){
+					email = prompt(errorMsg+"Please enter your email: ");
+				}				
+				
+				//unable to get email from hash/localstorage/prompt
+				if(!email || email == null){
+					alert("Wrong email. You can't connect to your invitation unless you input your email correctly.");
+					invitation = false;
+					break;
+				}
+				
+				email = email.trim();
+				var obj = decodeInvitationUrl(email);
+				if(!obj || !obj.channelName || !obj.channelPassword || !obj.nickName){
+					errorMsg = "(Incorrect) ";
+				}else{
+				
+					$('#channelName').val(obj.channelName);
+					$('#channelPassword').val(obj.channelPassword);
+					$('#nickName').val(obj.nickName);
+					localStorage['invitation-email-'+invitation] = email;
+					
+					break;
+				}
+				
+				email = null;
+			}
+			
+			
+			//bind events
+			$('.users-count').click(function(){
+				var users = channel.connectedUsers;
+				
+				var usersStr = 'Connected users are :\n';
+				for(var i=0;i<users.length;i++){
+					usersStr+= users[i] + '\n';
+				}				
+				alert(usersStr);
+				
+			});	
+			
+			$('#channel-text').click(function(){
+			
+				var channelInfo = channel.getChannelInfo();
+				var sessionInfo = channel.getSessionInfo();			
+				prompt('Channel name: '+channelInfo.name+'\n'+'Client is connected with session:',sessionInfo.id);
+
+			});
+		
+			var enterCheckBox = $('#press-enter input')[0];			
+			$('#press-enter').click(function(){
+				pressEnterMode(enterCheckBox.checked);
+			});			
+			pressEnterMode(enterCheckBox.checked);
+			
+			$('#usermsg').focus(function(){
+				setTimeout(function(){
+					$("#wrapper")[0].scrollTop = $("#wrapper")[0].scrollHeight;
+				},500);				
+			});
+				
+			$('#start').click(function(){
+				
+				if(!$('#channelName').val()){
+					return alert('Channel name is required');
+				} 
+				if(!$('#channelPassword').val()){
+					return alert('Channel password is required');
+				} 
+				
+				if(!$('#nickName').val()){
+					//return alert('username is required');
+					$('#nickName').val('Anonymous'+guid());
+				}
+				
+				channel.connect({
+					api : messagingApiUrl,
+					channelName : $('#channelName').val(),
+					channelKey : $('#channelPassword').val(),
+                    agentName : $('#nickName').val(),
+					autoReceive : '1000:500:25000',			
+				});
+			});			
+	
+			$('#close').click(function(){
+				var users = channel.connectedUsers;				
+				var lastOne = (users.length == 1);
+				
+				if(lastOne && messagesCount != 0){
+					if(!confirm('You are the only user connected to channel, and messages will be cleared once you are disconnected. Are you sure to continue?')){
+						return;
+					}
+				}
+				
+				setTimeout(function(){
+					//another check, you don't know if some user connects before the user clicked on 'yes' 
+					users = Object.keys(channel.connectedUsers);				
+					lastOne = (users.length == 1);
+					channel.disconnect(function(res){
+						if(res.status == 'success'){
+							uiDeactiveState();
+							messagesCount = 0;
+							
+							// no need to continue from the last receive range
+							if(lastOne){
+								delete channel._last_receive_range;
+							}
+						}else{
+							alert(res.data);
+						}
+					});
+				},500);
+			});
+			
+			$('#clear').click(function(){
+			
+				if($('#app-container').html() && confirm('Are you sure to delete the chat conversation?')){
+					$('#app-container').html('');
+				}				
+			});
+			
+			$('#clearmsg').click(function(){
+			
+				if($('#usermsg').val() && confirm('Are you sure to delete the chat text?')){
+					$('#usermsg').val('');
+				}
+				
+			});
+			
+			$('#submitmsg').click(send);
+
+			$("#channelName,#channelPassword,#nickName").keypress(function(e) {
+				if(e.which == 13) {
+					//$('#usermsg').val()
+					e.preventDefault();
+					$('#start').click();
+				}
+			});
+			
+			$("#usermsg").keypress(function(e) {
+				if(e.which == 13 && $('#press-enter input')[0].checked && !e.shiftKey) {
+					//$('#usermsg').val()
+					e.preventDefault();
+					send();
+				}
+			});
+			
+			/**
+			* Do something for mobile devices
+			*/
+			if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+				
+			}
+
+			channel = new HTTPChannel();
+			
+			channel.onreset = function(){
+				alert('Something went wrong, your session will be disconnected.');
+				channel.disconnect();
+			}
+			
+			channel.ondisconnect = uiDeactiveState;
+			
+			channel.onconnect = function(e){
+				var response = e.response;
+
+				sending = false;
+				if(response.status == 'success'){
+				
+					if(!notifier.enabled){
+						setTimeout(function(){
+							notifier.enabled = true;
+						},3000);
+					}
+					
+					console.log('connected to session');
+					console.log(response.data);
+					uiActiveState();
+					updateUsersCount();		
+				}else{
+					alert(response.data);
+				}
+			}
+			
+			channel.onmessage = function(e){
+				var response = e.response;
+
+				if(response.status == 'success'){
+					if(response.data && response.data != null && response.data.length > 0){	
+						
+						console.log('Received data: ');
+						console.log(response.data);
+						
+						for(var i=0;i<response.data.length;i++){
+							var item = response.data[i];
+							var	 date = new Date(item.date);
+							if(item.type == 'chat-text'){							
+								addReceivedMessage({name : item.from,img : "images/other.png"},item.content,date);
+							}else if (item.type == 'connect'){
+								notifier.show('New connection!','<b>'+item.from+'</b> is connected.');
+								updateUsersCount();
+								addConnectionEvent('User '+item.from+' is connected',
+												  '<span class="connection-event-connected"><b>'+item.from+'</b> is connected</span>',
+												  date);
+							}else if (item.type == 'disconnect'){
+								notifier.show('User disconnected!','<b>'+item.from+'</b> is disconnected.');
+								updateUsersCount();
+								addConnectionEvent('User '+item.from+' is disconnected',
+											  '<span class="connection-event-disconnected"><b>'+item.from+'</b> is disconnected</span>',
+											 date);
+							}					
+						}
+						
+					}
+				}else{
+					console.log('Rreceive error: ');							
+					console.log(response);
+				}	
+			}
+				
+	
+			
+			if(invitation){
+				$('#start').click();
+			}else if (hash.auth){
+				var authInfo = channel.decodeAuth(hash.auth);
+				$('#channelName').val(authInfo.channelName);
+				$('#channelPassword').val(authInfo.channelKey);
+				
+				if(hash.connect){
+					$('#start').click();
+				}
+				
+			}else{
+					
+				loadInputDomVal($('#channelName')[0],'channelName','default',true,false);
+				loadInputDomVal($('#channelPassword')[0],'channelPassword','default',true,true);
+				loadInputDomVal($('#nickName')[0],'nickName','',true,false);
+			}
+	
+		});
+
+		function onMessageEvent(message){
+			message = emojify.replace(message);
+			message = message.replace(/\n/gi,'<br/>');
+			messagesCount++;
+			return message;
+		}
+		
+		function addConnectionEvent(title,message,date){			
+			
+
+			var title = 'title="'+title+" at "+date.toLocaleString()+'"';
+			var el = '<div class="connection-event" '+title+' ><div class="connection-event-line"></div><div class="connection-event-text">'+message+'</div></div>';
+
+			$('#app-container').append(el);
+			
+			setTimeout(function(){
+				$("#app-container")[0].scrollTop = $("#app-container")[0].scrollHeight;
+			},200);	
+
+		}
+		
+		function sameMinute(d1,d2){
+			return (Math.abs(d1-d2)/1000) < 60 && d1.getMinutes() == d2.getMinutes();
+		}
+		
+		function formatTime(date){
+
+			var hours = date.getHours();
+			var mins = date.getMinutes()+'';			
+			var mode = 'AM';
+			
+			if(hours >= 12){
+				hours = (hours - 12)+'';				
+				mode = 'PM';
+			}
+			
+			hours = hours.length < 2? ('0'+hours):hours;
+			mins = mins.length < 2? ('0'+mins):mins;
+			
+			return hours+':'+mins+' '+mode;			
+		}
+		
+		function addSentMessage(user,message,date){
+			
+			message = onMessageEvent(message);
+			
+			if(last.type == 'sent' && last.user.name == user.name && sameMinute(date,last.date) ){
+				last.el.append('<br/>'+message);
+			}else{
+
+				var title = 'title="'+date.toLocaleString()+'"';
+				var el = $('<div class="right-side-container"><div class="message-user" style="display:none;">'+user.name+'</div><div class="user" style="float : right;" title="'+user.name+'"><img src="'+user.img+'"/></div><div class="side-message right-side-message" '+title+'>'
+				+'<div class="chat-message">'+message+'</div>'+'<div class="msg-time">'+formatTime(date)+'</div>'			
+				+'</div></div>');
+
+				last.el = el.find('.chat-message');
+				
+				$('#app-container').append(el);
+			}
+			
+			$('#usermsg').val('');
+			last.type = 'sent';
+			last.date = date;
+			last.user = user;
+			
+			setTimeout(function(){
+				$("#app-container")[0].scrollTop = $("#app-container")[0].scrollHeight;
+			},200);	
+		}
+		
+		function addReceivedMessage(user,message,date){			
+			
+			message = onMessageEvent(message);
+			
+			if(last.type == 'received' && last.user.name == user.name && sameMinute(date,last.date) ){
+				last.el.append('<br/>'+message);
+			}else{
+				
+				var title = 'title="'+date.toLocaleString()+'"';
+				var el = $('<div class="left-side-container"><div class="user" style="float : left;" title="'+user.name+'"><img src="'+user.img+'"/></div><div class="side-message left-side-message" '+title+'>'
+				+'<div class="message-user">'+user.name+'</div><div class="chat-message">'+message+'</div>'+'<div class="msg-time">'+formatTime(date)+'</div>'
+				+'</div></div>');
+
+				last.el = el.find('.chat-message');
+				$('#app-container').append(el);
+				
+			}
+			
+			last.type = 'received';
+			last.date = date;
+			last.user = user;
+			
+			setTimeout(function(){
+				$("#app-container")[0].scrollTop = $("#app-container")[0].scrollHeight;
+			},200);	
+				
+			notifier.playAudio();
+		}
+		
+		function encodeInvitationUrl(email){		
+			var invitation = $('#channelName').val()+'\n'+$('#channelPassword').val()+'\n'+email;													
+			return location.origin+location.pathname+'#invitation_'+MySecurity.encrypt(invitation,email);//+'#email='+MySecurity.encrypt(email,'email');
+		}
+		
+		function decodeInvitationUrl(email,hash){
+			var authCipher = parseHashParameters(hash).invitation.substring(3);
+			console.log('authCipher = '+authCipher);
+			var invitation_ = MySecurity.decrypt(authCipher,email);
+			if(!invitation_ || invitation_ == null){
+				return null;
+			}
+			
+			return {
+				channelName : invitation_.split('\n')[0],
+				channelPassword : invitation_.split('\n')[1],
+				nickName : invitation_.split('\n')[2]
+			}
+		}
+		
+		
+		
+		function S4() {
+			return (((1+Math.random())*0x10000)|0).toString(16).substring(1); 
+		}
+		function guid(){
+			return (S4() + S4() + S4() + S4().substr(0,3) + S4() + S4() + S4() + S4()).toLowerCase()
+		}
+
+		/*window.onbeforeunload = function(){
+			if(channel.readyState){
+				return 'Channel will be disconnected?';
+			}			
+		}*/
+		
+
+		</script>
+		
+
+	</body>
+
+</html>

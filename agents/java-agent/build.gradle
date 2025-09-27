@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.hmdev.messaging.agents'
+version = '1.0.0-SNAPSHOT'
+description = 'Project used to connect with http channel api'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Use testImplementation for testing libraries
+    testImplementation 'org.testng:testng:6.11'
+
+    implementation 'org.json:json:20231013'
+    implementation 'org.bouncycastle:bcprov-jdk15on:1.51'
+    implementation 'org.apache.commons:commons-io:1.3.2'
+
+    // Optional: uncomment if needed
+    // implementation 'io.pristine:libjingle-peerconnection:6888'
+}
+
+test {
+    useTestNG()
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir 'src/main/resources'
+            include '**/*.*'
+        }
+    }
+}
