@@ -18,9 +18,11 @@ All messages are **end-to-end encrypted** — the Origin Service only relays cip
    ```
 
 📸 *Web Agent Initial Connection*
+
 ![Web Initial](docs/images/web-initial.png)
 
 📸 *Web Agent Says Hello*
+
 ![Web Hello](docs/images/web-connect-and-say-hello.png)
 
 ---
@@ -65,9 +67,11 @@ based on their sample `main` code in the project.
 - Then disconnects gracefully.
 
 📸 *Web Agent Commands Exit*
+
 ![Web Exit Java](docs/images/web-ask-agents-to-exit.png)
 
 📸 *Java Agent Exit Message*
+
 ![Java Bye](docs/images/java-say-bye-and-exit.png)
 
 ---
@@ -85,6 +89,7 @@ based on their sample `main` code in the project.
 - Then disconnects gracefully.
 
 📸 *Python Agent Exit*
+
 ![Python Bye](docs/images/python-say-bye-and-exit.png)
 
 ---
