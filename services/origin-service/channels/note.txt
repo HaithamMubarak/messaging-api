@@ -1,1 +1,0 @@
-This folder should be public for reading/writing for all users to ensure the service working fine.

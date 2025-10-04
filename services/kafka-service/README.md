@@ -1,11 +1,12 @@
-# Kafka Service (Placeholder)
+# Kafka Service (Planned)
 
-Planned replacement/augmentation of the PHP polling relay with a **Kafka-backed** messaging backbone.
+The **Kafka Service** is a future implementation of the Messaging API relay, replacing the file-based PHP version with a scalable Kafka backend.
 
 ## Goals
-- Real-time delivery via Kafka topics per channel/tenant.
-- Persistence, replay, and higher throughput.
-- Agents authenticate and publish/subscribe via a gateway service.
+- Use **Apache Kafka** for distributed message streaming.
+- Provide persistence and replay support.
+- Handle higher throughput and larger agent networks.
+- Expose the same REST/WebSocket API as the origin service.
 
 ## Status
-- Skeleton Gradle project only. Implementation TBD.
+🚧 Not implemented yet. Planned as the next step.

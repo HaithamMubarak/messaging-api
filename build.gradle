@@ -19,7 +19,7 @@ tasks.register("cleanArtifacts") {
     }
 }
 
-// Copy PHP service
+// Copy origin service
 tasks.register("copyPhpService", Copy) {
     group = "build"
     from("services/origin-service")
@@ -56,4 +56,85 @@ tasks.register("assembleArtifacts") {
 // Make root build depend on assemble
 tasks.named("build") {
     dependsOn("assembleArtifacts")
+}
+
+
+configure(project(":agents:python-agent")) {
+    // Prevent Gradle from treating it as a Java project
+    tasks.configureEach {
+        enabled = false
+    }
+}
+
+
+// -------------------------
+// Docker Service Build Tasks
+// -------------------------
+
+// Gets docker related config
+def isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
+def baseDir = projectDir.toString().replace("\\", "/")
+def hostDataDir = isWindows ? "${baseDir}/data/origin-service/channels" : "/root/data/messaging-api/origin-service/channels"
+def containerDataDir = "/var/www/html/messaging-api/origin-service/channels"
+
+static def shellCommand(cmd, isWindows) {
+    if (isWindows) {
+        return ["cmd", "/c", cmd]
+    } else {
+        return ["sh", "-c", cmd]
+    }
+}
+// -------------------------
+// Origin Service Tasks
+// -------------------------
+
+// Build Docker image
+tasks.register("originServiceBuild", Exec) {
+    commandLine 'docker', 'build',
+            '-f', 'docker/Dockerfile.origin-service',
+            '-t', 'messaging-api:origin-service', '.'
+
+    doFirst {
+        println ">>> Executing: ${commandLine.join(' ')}"
+    }
+}
+
+// Run container with mounted folder
+tasks.register("originServiceRun", Exec) {
+    doFirst {
+        println ">>> Preparing host data directory: ${hostDataDir}"
+        mkdir(hostDataDir)
+        println ">>> Executing: docker run -d -p 8080:80 --name origin-service -v ${hostDataDir}:${containerDataDir} messaging-api:origin-service"
+    }
+
+    if (!isWindows)
+    {
+        commandLine 'chmod', '777', hostDataDir
+    }
+
+    commandLine shellCommand("""
+        docker container rm -f origin-service || true && \
+        docker run -d -p 8080:80 \
+            --name origin-service \
+            -v ${hostDataDir}:${containerDataDir} \
+            messaging-api:origin-service
+    """, isWindows)
+}
+
+// Stop container
+tasks.register("originServiceStop", Exec) {
+    commandLine shellCommand("docker container stop origin-service || true && docker container rm origin-service || true", isWindows)
+
+    doFirst {
+        println ">>> Executing: ${commandLine.join(' ')}"
+    }
+}
+
+// Build + Run
+tasks.register("originServiceUp") {
+    dependsOn("originServiceBuild", "originServiceRun")
+
+    doFirst {
+        println ">>> Running Origin Service (Build + Run)"
+    }
 }

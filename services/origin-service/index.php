@@ -4,12 +4,28 @@ require_once __DIR__ . '/json_response.php';
 require 'messages.php';
 require 'lock.php';
 
+
 require 'aes/aes.class.php';     // AES PHP implementation
 require 'aes/aesctr.class.php';  // AES Counter Mode implementation
 
+class AgentSessionStatus {
+    const AVAILABLE = 'AVAILABLE';
+    const NOT_AVAILABLE = 'NOT_AVAILABLE';
+    const AVAILABLE_KNOWN = 'AVAILABLE_KNOWN';
+}
+
+function getCurrentTime()
+{
+    if(function_exists("microtime")){
+        return round(microtime(true) * 1000);
+    }else{
+        return (time()) * 1000;
+    }
+}
+
 ignore_user_abort(false);
 error_reporting(E_ERROR | E_PARSE);
-//error_reporting(E_ALL ^ E_WARNING); 
+//error_reporting(E_ALL ^ E_WARNING);
 
 $oldFileLifeTime = 24 * 60 * 60;
 
@@ -17,21 +33,20 @@ $oldFileLifeTime = 24 * 60 * 60;
 set_time_limit(5 * 30);
 
 // set default to utc
-//date_default_timezone_set("UTC"); 
+//date_default_timezone_set("UTC");
 
 header("Access-Control-Allow-Origin: *");
 
 $action = isset($_GET["action"])?htmlspecialchars($_GET["action"]):"";
-$noEncryption = strtolower((isset($_GET["no-encryption"])?$_GET["no-encryption"]:'false')) == 'true';
+$usePubKey = strtolower((isset($_GET["use-pubkey"]) ? $_GET["use-pubkey"]:'false')) == 'true';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
-	endWithError("Unsupported Request Method");
+	json_error("Unsupported Request Method");
 }else{
 	  $data = isset($_GET["data"])?htmlspecialchars($_GET["data"]):file_get_contents('php://input');
-	  
 }
 
-if(!$noEncryption){
+if($usePubKey){
 
 	$pem_private_key = file_get_contents('id_rsa');
 	$private_key = openssl_pkey_get_private($pem_private_key);
@@ -39,114 +54,124 @@ if(!$noEncryption){
 	$cipher = $data;
 	$plain = '';
 
-	for($i=0;$i<strlen($cipher);$i+=344){	
+	for($i=0;$i<strlen($cipher);$i+=344){
 
 		$token = substr($cipher,$i,344);
 		/*if($action == 'send'){
 			json_ok(["message"=>"\1"]);
 		}*/
-		
+
 		$token = base64_decode($token);
 		openssl_private_decrypt($token,$decrypted,$private_key);
 
 		$plain .= $decrypted;
-	}	
+	}
 
 	$data = $plain;
 	$data = json_decode($plain);
 
 }else{
-	$data = new \stdClass();
-	$data->channelName = 'def';
-	$data->channelPassword = 'def';
-	$data->agentName = $_GET["user"];
+    $data = json_decode($data);
 }
 
 error_log("Custom log message from PHP script " . json_encode($data) );
 
 try{
-	
+
 	$controller = new ChannelController($data->session);
-			
+
 	switch($action){
-		
-		case 'user-info':
-			
-			$controller->connect();			
+
+		case 'agent-info':
+
+			$controller->connect();
 			$data->channelPassword = $controller->getChannelPassword();
-			$response = $controller->getUserInfo($data->agentName);
+			$response = $controller->getAgentInfo($data->agentName);
 
-			endResponse(json_encode($response),$noEncryption?'':$data->channelPassword);
-			
-		case 'active-users':
-			
-			$controller->connect();	
-			
+			json_ok(json_encode($response));
+			break;
+		case 'active-agents':
+
+			$controller->connect();
+
 			$data->channelPassword = $controller->getChannelPassword();
 
-			$receivedData = $controller->getActiveUsers();
+			$receivedData = $controller->getActiveAgents();
 
-			endResponse(json_encode($receivedData),$noEncryption?'':$data->channelPassword);
-		case 'connect' : 
+			json_ok(json_encode($receivedData));
+			break;
+		case 'connect' :
 
-			$controller->setupSession($data->channelName,$data->channelPassword,$data->agentName);
-			
+			$newSession = $controller->setupSession($data->channelName,$data->channelPassword,$data->agentName, $data->agentContext);
+
 			$controller->connect();
 
 			$sessionId = $controller->sessionId;
 			$channelId = $controller->channelId;
-		
-			$activeUsers = $controller->getActiveUsers();
-			
-			if(sizeof($activeUsers) <= 1){
+
+			$activeAgents = $controller->getActiveAgents();
+
+			if(sizeof($activeAgents) <= 1){
 				$controller->dispatch('clear-events');
 			}
-			
-			$controller->dispatch('connect');
 
-			$connectResponse = "{\"channelId\" : \"$channelId\" ,\"sessionId\" : \"$sessionId\", \"role\" : \"$role\"}";
-			endResponse($connectResponse,$noEncryption?'':$data->channelPassword);
-			
-		break;
-		
-		case 'event' : 
+            if ($newSession)
+            {
+			    $controller->dispatch('connect');
+            }
+            else
+            {
+                $controller->dispatch('re-connect');
+            }
+            $connectResponse = json_encode([
+                    "channelId" => $channelId,
+                    "sessionId" => $sessionId,
+                    "role" => $role,
+                    "date" => getCurrentTime()
+            ]);
+			json_ok($connectResponse);
+		    break;
+
+		case 'event' :
 			$controller->connect();
 			$controller->dispatch($data);
-			endResponse('Success');
+			json_ok(null, "Success");
+            break;
+
 		case 'receive' :
 			$controller->connect();
-			$data->channelPassword = $controller->getChannelPassword();			
+			$data->channelPassword = $controller->getChannelPassword();
 			$receivedData = $controller->receive($data->range);
-			endResponse(json_encode($receivedData),$noEncryption?'':$data->channelPassword);
-		break;
-		
-		case 'disconnect' : 
-			$controller->connect($data->session);
-			$controller->dispatch('disconnect');			
-			$controller->disconnect();
-			endResponse('Success');
+			json_ok(json_encode($receivedData));
+		    break;
 
-		break;
-		
+		case 'disconnect' :
+			$controller->connect($data->session);
+			$controller->dispatch('disconnect');
+			$controller->disconnect();
+			json_ok(null, "Success");
+
+		    break;
+
 		default :
-			endWithError('Operation Not Supported');
-		break;	
+			json_error('Operation Not Supported');
+		break;
 	}
 
-	
+
 }catch(Exception $e){
-	endWithError($e->getMessage());
+	json_error($e->getMessage());
 }
 
 class ChannelController{
-	
+
 	public static $PARENT_PATH = './channels';
 	public static $SESSION_CHANNEL_MAP_PATH = './channels/map';
 	public static $long_poll_enable = false;
-	
+
 	// Max count for active usrs
-	public static $MAX_ACTIVE_USERS = 5;
-	
+	public static $MAX_ACTIVE_AGENTS = 5;
+
 	// Timeout idle session in seconds
 	public static $SESSION_INACTIVE_TIMEOUT = 2 * 60;
 
@@ -155,48 +180,62 @@ class ChannelController{
 		if(!file_exists(self::$PARENT_PATH)){
 			mkdir(self::$PARENT_PATH, 0777, true);
 		}
-		
+
 		if(!file_exists(self::$PARENT_PATH."/.htaccess")){
 			$htacessContents = "<files *>\n\tdeny from all\n</files>";
 			write_to_file(self::$PARENT_PATH."/.htaccess",$htacessContents);
 		}
-		
+
 		if(!file_exists(self::$SESSION_CHANNEL_MAP_PATH)){
 			mkdir(self::$SESSION_CHANNEL_MAP_PATH, 0777, true);
 		}
-		
+
 		$this->sessionId = $sessionId;
 	}
-	
+
 	function connect(){
 
 		if(!$this->sessionId){
-			throw new Exception('Session parameter is not defiend');
+			throw new Exception('Session parameter is not defined');
 		}
-		
+
 		$this->channelId = read_file(self::$SESSION_CHANNEL_MAP_PATH.'/'.$this->sessionId);
 		$this->channelLocker = new FileLock($this::channelLockPath($this->channelId));
 		//die('C');
 		$this->sessionLocker = new FileLock($this::channelSessionsLocksPath($this->sessionId));
-			//die('B:: '.$this::channelSessionsLocksPath($this->sessionId));	
+			//die('B:: '.$this::channelSessionsLocksPath($this->sessionId));
 		if(!$this->sessionLocker->lock(false)){
 			throw new Exception('Session Lock error');
 		}
-		
+
 		$this->renewSession();
 	}
-	
-	function setupSession($channelName,$channelPassword,$agentName){
+
+    function getClientIP() {
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            return $_SERVER['HTTP_CLIENT_IP'];
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            // Can contain multiple IPs, take the first one
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            return trim($ips[0]);
+        } else {
+            return $_SERVER['REMOTE_ADDR'];
+        }
+    }
+
+	function setupSession($channelName,$channelPassword,$agentName, $agentContext){
+
+	    $newSession = true;
 		if(!$channelName){
-			throw new Exception("Channel name is required for connection");			
+			throw new Exception("Channel name is required for connection");
 		}
 		if(!$channelPassword){
-			throw new Exception("Channel password is required for connection and messages encryption");			
-		}		
+			throw new Exception("Channel password is required for connection and messages encryption");
+		}
 		if(!$agentName){
 			throw new Exception("AgentName/NickName is required. It is used to exchange messages between peers and clients");
 		}
-		
+
 		if(preg_match("/[\*\/,\\\\\s]+/",$channelName)){
 			throw new Exception("Channel name shouldn't have any chracter in (*\\/,) and no space");
 		}
@@ -206,34 +245,45 @@ class ChannelController{
 		if(preg_match("/[\*\/,\\\\]+/",$agentName)){
 			throw new Exception("Channel agentName/NickName shouldn't have any chracter in (*\\/,) but may have spaces");
 		}
-		
+
 		$this->channelId = $channelId = self::getChannelId($channelName,$channelPassword);
 
-		if(sizeof($this->getActiveUsers())>=self::$MAX_ACTIVE_USERS){
-			throw new Exception('This is free channel, only '.self::$MAX_ACTIVE_USERS.' peers are supported.');
+		if(sizeof($this->getActiveAgents())>=self::$MAX_ACTIVE_AGENTS){
+			throw new Exception('This is free channel, only '.self::$MAX_ACTIVE_AGENTS.' agents are supported.');
 		}
-		
-		if(!$this::isUserAvailable($agentName)){
-			throw new Exception("User $data->user is already active, please select another name");
+
+        $AgentSessionStatus = $this::getAgentSessionStatus($agentName, $this->sessionId);
+		if($AgentSessionStatus == AgentSessionStatus::NOT_AVAILABLE){
+ 			throw new Exception("Agent $data->agentName is already active, please select another name");
 		}else{
-			$this->sessionId = $sessionId = guid16();
 
-			$userJson = new \stdClass();
-			$userJson->agentName = $agentName;
-			$userJson->sessionId = $this->sessionId;
-			$userJson->userInfo = new \stdClass();
-			$userJson->userInfo->userAgent = $_SERVER['HTTP_USER_AGENT'];
-			$userJson->userInfo->address = $_SERVER['REMOTE_ADDR'];
-			$userJson->userInfo->forwardedAddress = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            if ($AgentSessionStatus  == AgentSessionStatus::AVAILABLE_KNOWN)
+            {
+                $sessionId = $this->sessionId;
+                $newSession = false;
+            }
+            else
+            {
+                $this->sessionId = $sessionId = guid16();
+            }
 
-			$sessionJson = new \stdClass();
-			$sessionJson->agentName = $agentName;
-	
-			write_to_file($this::channelUsersPath($agentName),json_encode($userJson));
+            $agentContext -> ip_address = $this->getClientIP();
+
+            $agentJson = [
+                "agentName"    => $agentName,
+                "date"         => getCurrentTime(),
+                "sessionId"    => $this->sessionId,
+                "agentContext" => $agentContext
+            ];
+
+			$sessionJson = new stdClass();
+			$sessionJson -> agentName = $agentName;
+
+			write_to_file($this::channelAgentsPath($agentName),json_encode($agentJson));
 			write_to_file($this::channelSessionsPath($sessionId),json_encode($sessionJson));
-		
+
 			if(!file_exists($this::channelInfoPath())){
-				$channelJson = new \stdClass();
+				$channelJson = new stdClass();
 				$channelJson->channelName = $channelName;
 				//note that the frontend api send a hashed value of password not the password itself
 				$channelJson->channelPassword = $channelPassword;
@@ -243,184 +293,180 @@ class ChannelController{
 
 			write_to_file(self::$SESSION_CHANNEL_MAP_PATH.'/'.$sessionId , $this->channelId);
 
+			return $newSession;
 		}
 
 	}
-	
+
 	function receive($range){
-	
+
 		if(!$this->sessionLocker->lock(true)){
 			throw new Exception('session lock error: current session is already active.');
 		}
-		
+
 		$sessionId = $this->sessionId;
-		$datafrom = $this->getagentName();
-		
+		$datafrom = $this->getAgentName();
+
 		if($datafrom == null || $datafrom == ''){
-			throw new Exception('Session id is invalid, no user is connected to this session,nnnnn');
+			throw new Exception('Session id is invalid, no agent is connected to this session.');
 		}
 
-		$currentUser = $datafrom;
+		$currentAgent = $datafrom;
 		$counter_file = $this->channelParentPath()."/events.counter";
-		
-		read_counter : 
-		
+
+		read_counter :
+
 		$event_max_index = (int)read_file($counter_file);
 
 		if(!strrpos($range,"-")){
 			$range .= '-';
-		}	
+		}
 		$event_range_start = substr($range,0,strrpos($range,"-"));
 		$event_range_end = substr($range,strrpos($range,"-")+1);
 
 		if(!$event_range_end){
 			$event_range_end = PHP_INT_MAX ;
-		}	
+		}
 		$events = Array();
-	
+
 		$max_data_length = $event_range_end - $event_range_start + 1;
-		
+
 		$updateLength = 0;
-		
-		for($i = $event_range_start; $i <= $event_max_index && sizeof($events) < $max_data_length; $i++){	
-			
+
+		for($i = $event_range_start; $i <= $event_max_index && sizeof($events) < $max_data_length; $i++){
+
 			$content = read_file($this->channelEventsPath($i));
 			$json = json_decode($content);
-			
+
 			/*$json->session == "$session_id" || */
-			if( $json->from != $currentUser && preg_match("/".$json->to."/",$currentUser)){
-				unset($json->session); 
-				unset($json->to); 
+			if( $json->from != $currentAgent && preg_match("/".$json->to."/",$currentAgent)){
+				unset($json->session);
+				unset($json->to);
 				array_push($events,$json);
 			}else{
 			}
-			
+
 			$updateLength++;
 
 		}
-		
+
 		$response = new stdClass();
 		$response->updateLength = $updateLength;
 
 		// if there are not existing events, we should wait until new event
 		// is triggered.
 		if(sizeof($events) == 0){
-			$c = new MessageConnector($this->channelSessionsSocketsPath($sessionId));	
+			$c = new MessageConnector($this->channelSessionsSocketsPath($sessionId));
 
 			while(true){
-				
+
 				if(self::$long_poll_enable){
 					$msg = $c->receive();
 				}else{
 					//$msg = ':no-client';
 					break;
-				}				
-				
-				// for timeout, the server can send the connected clinets as response
+				}
+
+				// for timeout, the server can send the connected agents as response
 				if($msg == ':no-client'){
 					//json_ok(["message"=>"\1"]);
-					$users = $this->getActiveUsers();	
-					//print_r($users);
-					foreach ($users as $user){
+					$agents = $this->getActiveAgents();
+
+					foreach ($agents as $agent){
 						$obj = new stdClass();
-						$obj->type = 'connected-user';
-						$obj->user = $user;
+						$obj->type = 'connected-agent';
+						$obj->agent = $agent;
 						$obj->to = ".*";
 						array_push($events,$obj);
 					}
-					
-					break;					
+
+					break;
 				}else if($msg == ':event'){
 					goto read_counter;
 				}else if($msg == ':close'){
 					$c->close();
 					$fl->unlock();
-					endWithPending('closed');
+					json_pending('closed');
 				}
 			}
-			
+
 		}
-		
+
 		$this->sessionLocker->unlock();
-		
+
 		$this->renewSession();
-		
+
 		$response->events = $events;
-		
-		return $response;			
+
+		return $response;
 	}
-	
+
 	function dispatch($data){
 		if(is_string($data)){
 			$event = new stdClass();
 			$event->session = $this->sessionId;
 			$event->type = $data;
 			$event->to = ".*";
-			
+
 			$data = $event;
 		}
-		
+
 		$type = $data->type;
-		
+
 		/**
-		** TODO : File type feature to be added later		   
-		** 
+		** TODO : File type feature to be added later
+		**
 		**/
 		if(!isset($type)){
 			throw new Exception('Message type is required, use value like [chat-text|rtc|script-eval|file-put|script-response...].');
 		}
-		
+
 		$sessionId = $this->sessionId;
-		$datafrom = $this->getagentName();
-		
+		$datafrom = $this->getAgentName();
+
 		if($datafrom == null || $datafrom == ''){
-			throw new Exception('Session id is invalid, no user is connected to this session');
+			throw new Exception('Session id is invalid, no agent is connected to this session');
 		}
-		
+
 		$data->from = $datafrom;
-		
-		if(function_exists("microtime")){
-			$data->date = round(microtime(true) * 1000);
-		}else{
-			$data->date = (time()) * 1000;
-		}
-	
+        $data->date = getCurrentTime();
+
 		//Use UTC time zone, so each client can map the time using its local timezone
 		//$data->date += date("Z") * 1000;
-		
+
 		$tester = new MessageConnector("");
-		
+
 		$retries = 3;
 		$timeout = 10;
 		$startTime = time();
-		
+
 		while(!($lockState = $this->channelLocker->lock(false)) && $retries>0 && (time()-$startTime)<$timeout){
 			$retries--;
 		}
-		
+
 		$counter_file = $this->channelParentPath()."/events.counter";
 		$this->counter_file = $counter_file;
-			
+
 		if($lockState){
 
 			if($type == 'clear-events'){
 				$eventsFolder = $this->channelEventsPath();
-	
+
 				foreach(scandir($eventsFolder) as $eventFileName){
 					if($eventFileName == '.' || $eventFileName == '..'){
 						continue;
 					}
 					unlink("$eventsFolder/$eventFileName");
 				}
-				
+
 				write_to_file("$counter_file","-1");
 				$this->channelLocker->unlock();
-				
+
 			}else{
-				
+
 				//handle the event and unlock the channel
 				$this->handleEvent($data);
-				
+
 				//notify other pending mode connections
 				// currently it is not used
 				foreach (scandir($this->channelSessionsPath()) as $sessionId){
@@ -430,43 +476,43 @@ class ChannelController{
 					}
 				}
 			}
-		
 
-			usleep(200);			
+
+			usleep(200);
 			$this->renewSession();
-					
+
 		}else{
 			throw new Exception("Channel lock error");
 		}
-		
+
 	}
-	
+
 	function logChannelEvent($data){
 		$counter_file = $this->counter_file;
-		
+
 		if(!file_exists($counter_file)){
 			write_to_file("$counter_file","-1");
-		}		
-		
+		}
+
 		$event_index = (int)read_file($counter_file);
-		$event_index++;							
+		$event_index++;
 		write_to_file("$counter_file","$event_index");
 		write_to_file($this->channelEventsPath("$event_index"),json_encode($data));
 	}
-	
+
 	function handleEvent($data){
 		switch($data->type){
 			case "file-list":
 				$this->channelLocker->unlock();
 				$rootPath = $this->channelUploadPath($data->root);
-						
+
 				$files = Array();
-				
+
 				foreach(scandir($rootPath) as $subFile){
 					if($subFile == '.' || $subFile == '..'){
 						continue;
 					}
-					
+
 					$fullpath = "$rootPath/$subFile";
 					$obj = new stdClass();
 					$obj->name = $subFile;
@@ -479,14 +525,14 @@ class ChannelController{
 					}
 					array_push($files,$obj);
 				}
-				
+
 				die(json_encode($files));
 
 			break;
 			case "file-mv":
 				$this->channelLocker->unlock();
 				$filepath = $this->channelUploadPath($data->filename);
-				
+
 				if(file_exists($filepath)){
 					unlink($filepath);
 				}
@@ -499,29 +545,29 @@ class ChannelController{
 			break;
 			case "file-delete":
 				$this->channelLocker->unlock();
-				
+
 				$filename = $data->filename;
 				if(!is_array($filename)){
 					$filename = Array($filename);
 				}
-				
-				foreach($filename as $filenameItem){								
+
+				foreach($filename as $filenameItem){
 					$filepath = $this->channelUploadPath($filenameItem);
 
 					if(file_exists($filepath)){
 						if(is_dir($filepath)){
-							rrmdir($filepath);						
+							rrmdir($filepath);
 						}else{
 							unlink($filepath);
 						}
 					}
-				}	
+				}
 
 			break;
 			case "file-put":
 				$this->channelLocker->unlock();
 				$filepath = $this->channelUploadPath($data->filename);
-				
+
 				copyStream('php://input',$filepath,$data->append);
 				/*if($data->append == true){
 					file_put_contents($filepath, file_get_contents('php://input'), FILE_APPEND);
@@ -555,11 +601,11 @@ class ChannelController{
 	}
 
 	function disconnect(){
-		$sessionId = $this->sessionId;		
+		$sessionId = $this->sessionId;
 		$tester = new MessageConnector("");
 
 		if($tester->check_status($this->channelSessionsSocketsPath($sessionId))){
-			$tester->dispatch($this->channelSessionsSocketsPath($sessionId),":close");			
+			$tester->dispatch($this->channelSessionsSocketsPath($sessionId),":close");
 		}
 
 		$deletePaths = Array(
@@ -567,7 +613,7 @@ class ChannelController{
 			$this->channelSessionsSocketsPath($sessionId),
 			$this->channelSessionsLocksPath($sessionId),
 			$this->channelSessionsPath($sessionId),
-			$this->channelUsersPath($this->getagentName())
+			$this->channelAgentsPath($this->getAgentName())
 		);
 
 		foreach($deletePaths as $path){
@@ -576,122 +622,125 @@ class ChannelController{
 			}
 		}
 
-	}	
-	
+	}
+
 	function renewSession($unlock=false){
 		$this->sessionLocker->lock(true);
 		$this->sessionLocker->unlock();
 	}
-	
-	function getagentName(){
+
+	function getAgentName(){
 		$sessionInfo = read_file($this->channelSessionsPath($this->sessionId));
-		
+
 		if($sessionInfo){
 			return json_decode($sessionInfo)->agentName;
-		}		
-	}
-	
-	function getSessionFromUser($agentName){
-		$userInfo= read_file($this->channelUsersPath($this->sessionId));
-		if($userInfo){
-			return json_decode($userInfo)->sessionId;
-		}		
-	}
-	
-	function transformUserInfo($userInfo){
-		$userInfoTransfom = new \stdClass();
-		
-		$userInfoTransfom->agentName = $userInfo->agentName;
-		$userInfoTransfom->userInfo = $userInfo->userInfo;
-		
-		return $userInfoTransfom;		
-	}
-	
-	function getUserInfo($agentName){
-		$str = read_file($this->channelUsersPath($agentName));
-		
-		if($str){
-			$userInfo = json_decode($str);
-			return $this->transformUserInfo($userInfo);
-		}else{
-			throw new Exception("User $agentName is not found");
 		}
 	}
-	
-	function getActiveUsers(){
-		$users = Array();
 
-		$parentPath = $this::channelUsersPath();
-		$usersFolder = scandir($parentPath);
-		
-		
-		foreach($usersFolder as $userfileName){
-			if($userfileName == '.' || $userfileName == '..'){
+	function getSessionFromAgent(){
+		$agentInfo = read_file($this->channelAgentsPath($this->sessionId));
+		if($agentInfo){
+			return json_decode($agentInfo)->sessionId;
+		}
+	}
+
+	function transformAgentInfo($agentInfo){
+		$agentInfoTransform = new \stdClass();
+
+		$agentInfoTransform->agentName = $agentInfo->agentName;
+        $agentInfoTransform->date = $agentInfo->date;
+		$agentInfoTransform->agentContext = $agentInfo->agentContext;
+
+		return $agentInfoTransform;
+	}
+
+	function getAgentInfo($agentName){
+		$str = read_file($this->channelAgentsPath($agentName));
+
+		if($str){
+			$agentInfo = json_decode($str);
+			return $this->transformAgentInfo($agentInfo);
+		}else{
+			throw new Exception("Agent $agentName is not found");
+		}
+	}
+
+	function getActiveAgents(){
+		$agents = Array();
+
+		$parentPath = $this::channelAgentsPath();
+		$agentsFolder = scandir($parentPath);
+
+		foreach($agentsFolder as $agentFileName){
+			if($agentFileName == '.' || $agentFileName == '..'){
 				continue;
 			}
-		
-			$path = $parentPath.'/'.$userfileName;
-			$userInfoString = read_file($path);
-			$userInfo = json_decode($userInfoString);
 
-			if(!$this->isUserAvailable($userInfo->agentName)){
-				array_push($users,$this->transformUserInfo($userInfo));
+			$path = $parentPath.'/'.$agentFileName;
+			$agentInfoString = read_file($path);
+			$agentInfo = json_decode($agentInfoString);
+
+			if($this->getAgentSessionStatus($agentInfo->agentName) == AgentSessionStatus::NOT_AVAILABLE){
+				array_push($agents, $this->transformAgentInfo($agentInfo));
 			}
-			
+
 		}
-		
-		return $users;
+
+		return $agents;
 	}
-	
+
 	function getChannelPassword(){
 		 $str = read_file($this::channelInfoPath());
-		 
+
 		 if($str){
 			$json = json_decode($str);
-			return $json->channelPassword; 
+			return $json->channelPassword;
 		 }
 	}
-	
-	function isUserAvailable($agentName){
+
+	function getAgentSessionStatus($agentName, $knownSessionId = null){
 		$available = false;
-		if(!file_exists($this::channelUsersPath($agentName))){
+		if(!file_exists($this::channelAgentsPath($agentName))){
 			$available = true;
 		}else{
-			$json = json_decode(read_file($this::channelUsersPath($agentName)));
-			
-			$agentName = $json->agentName;
+			$json = json_decode(read_file($this::channelAgentsPath($agentName)));
+
 			$sessionId = $json->sessionId;
-			$userInfo = $json->userInfo;			
-		
+
 			$sessionLockFile = $this::channelSessionsLocksPath($sessionId);
 			$sessionFile = $this::channelSessionsPath($sessionId);
+
 			if(file_exists($sessionLockFile) && file_exists($sessionFile)){
-				
-				$fl = new FileLock($sessionLockFile);		
+
+                if ($knownSessionId !== null && $sessionId === $knownSessionId) {
+                    return AgentSessionStatus::AVAILABLE_KNOWN;
+                }
+
+				$fl = new FileLock($sessionLockFile);
 				$diff = PHP_INT_MAX;
-				
+
 				if(file_exists($fl->path)){
-					$diff = time() - filemtime($sessionLockFile);			
+					$diff = time() - filemtime($sessionLockFile);
 				}
-				
-				$session_aquired = $fl->lock(true);
-				
-				if($session_aquired){
+
+				$session_acquired = $fl->lock(true);
+
+				if($session_acquired){
 					$fl->unlock();
 				}
-				
-				$available  = ($diff > $this::$SESSION_INACTIVE_TIMEOUT) && $session_aquired;
+
+				$available  = ($diff > $this::$SESSION_INACTIVE_TIMEOUT) && $session_acquired;
 			}else{
 				$available = true;
 			}
-	
+
 		}
-		return $available;
+		return $available ? AgentSessionStatus::AVAILABLE : AgentSessionStatus::NOT_AVAILABLE;
 	}
 
 	function channelParentPath(){
 		return $this->getFolderPath([self::$PARENT_PATH,$this->channelId]);
-	}	
+	}
 	function channelLockPath(){
 		return $this->getFolderPath([$this::channelParentPath()],'channel.lock');
 	}
@@ -707,28 +756,28 @@ class ChannelController{
 	function channelEventsPath($event=NULL){
 		return $this->getFolderPath([$this::channelParentPath(),'events'],$event);
 	}
-	
+
 	function channelUploadPath($filename=NULL){
 		return $this->getFolderPath([$this::channelParentPath(),'upload'],$filename);
 	}
-	
+
 	function channelInfoPath(){
 		return $this->getFolderPath([$this::channelParentPath()],'info.dat');
 	}
-	
-	function channelUsersPath($agentName=NULL){
+
+	function channelAgentsPath($agentName=NULL){
 		if($agentName != NULL){
 			$agentName = md5($agentName);
 		}
-		return $this->getFolderPath([$this::channelParentPath(),'users'],$agentName);
+		return $this->getFolderPath([$this::channelParentPath(),'agents'],$agentName);
 	}
-	
+
 	static function getChannelId($channelName,$channelPass){
 		return sha1(md5($channelName).':'.md5($channelPass));
 	}
-	
+
 	function getFolderPath($array,$filename=NULL){
-		
+
 		if(!$this->channelId){
 			throw new Exception('Session is expired or connection channel is not valid.');
 		}
@@ -737,15 +786,15 @@ class ChannelController{
 			if($path == ''){
 				$path = $item;
 			}else{
-				$path = "$path/$item"; 
+				$path = "$path/$item";
 			}
-			
+
 			/*if(!file_exists($path)){
 				mkdir($path, 0777, true);
 			}*/
 
 		}
-		
+
 		if(file_exists($path) && !is_dir($path)){
 			throw new Exception("$path is not a directory");
 		}
@@ -754,47 +803,54 @@ class ChannelController{
 		if(!file_exists($path) || !is_dir($path)){
 			throw new Exception("Unable to create directory $path, please check permissions and name syntax");
 		}
-		
+
 		if($filename != null){
 			$path = $path.'/'.$filename;
 		}
 		return $path;
-	
-	}
-	
-}
-
-class MySecurity{
-	
-	public static function encrypt($message,$key){
-		return AesCtr::encrypt($message, $key, 128);
-	}
-	
-	public static function decrypt($cipherMsg,$key){
-		return AesCtr::decrypt($myObj->cipher, $key, 128);
-	}
-	
-	public static function encryptWithMd5Auth($message,$key){
-		$myObj =  new stdClass();
-		$myObj->cipher = AesCtr::encrypt($message, $key, 128);
-		$myObj->md5 = md5($message);
-		return json_encode($myObj);
-	}
-	
-	public static function decryptWithMd5Auth($cipherMsg,$key){
-		$myObj =  json_decode($cipherMsg);
-		
-		$message = AesCtr::decrypt($myObj->cipher, $key, 128);
-		
-		if(md5($message) !== $myObj->md5){
-			return false;
-		}else{
-			return $message;
-		}
 
 	}
-	
+
 }
+
+class MySecurity {
+
+    public static function sha256($input) {
+        return hash("sha256", $input);
+    }
+
+    public static function encrypt($message, $key) {
+        return AesCtr::encrypt($message, $key, 128);
+    }
+
+    public static function decrypt($cipherMsg, $key) {
+        return AesCtr::decrypt($cipherMsg, $key, 128);
+    }
+
+    public static function encryptWithAuth($message, $key) {
+        $myObj = new stdClass();
+        $myObj->cipher = AesCtr::encrypt($message, $key, 128);
+        $myObj->hash   = self::sha256($message); // hash of plaintext for integrity
+        return json_encode($myObj);
+    }
+
+    public static function decryptWithAuth($cipherMsg, $key) {
+        $myObj = json_decode($cipherMsg);
+
+        if (!isset($myObj->cipher) || !isset($myObj->hash)) {
+            return false; // malformed input
+        }
+
+        $message = AesCtr::decrypt($myObj->cipher, $key, 128);
+
+        // Verify SHA-256 integrity
+        if (self::sha256($message) !== $myObj->hash) {
+            return false;
+        }
+        return $message;
+    }
+}
+
 
 function copyStream($file_source, $file_target,$append) {
 	$rh = fopen($file_source, 'rb');
@@ -803,7 +859,7 @@ function copyStream($file_source, $file_target,$append) {
 	}else{
 		$wh = fopen($file_target, 'ab');
 	}
-	
+
 	if ($rh===false || $wh===false) {
 		die("Stream Error");
 		// error reading or opening file
@@ -821,13 +877,13 @@ function copyStream($file_source, $file_target,$append) {
 	// No error
 	return false;
 }
-	
+
 function write_to_file($file,$content){
 	$f = fopen($file,"w");
 	if(true){
 		fwrite($f, $content);
 		//flock($f, LOCK_UN);
-		fclose($f);			
+		fclose($f);
 		return true;
 	}else{
 		fclose($f);
@@ -839,52 +895,13 @@ function read_file($file){
 	if(filesize($file) == 0){
 		return "";
 	}
-	
+
 	$f = fopen($file,"r");
 	$content = fread($f,filesize($file));
 	fclose($f);
 	return $content;
 }
 
-
-function endResponse($message,$encryptPassword=NULL){
-	//header('HTTP/1.1 200 OK');
-
-	if($encryptPassword != NULL){		
-		$message = MySecurity::encryptWithMd5Auth($message,$encryptPassword);
-	}
-
-	die($message);
-}
-
-function endWithPending($message){
-	header('HTTP/1.1 302 Found');
-	die($message);
-}
-
-function endWithError($message){
-	header('HTTP/1.1 500 Internal Server Error');
-
-	?>
-		<style>
-			.error{
-				color : red;
-				font-size : 20px;
-				width : 100%;
-				text-align : center;
-			}
-		</style>
-		<p class="error"><?php echo $message;?></p>
-		
-		
-	<?php
-	die();
-}
-
-function endWithInvalidLogin(){
-	header('HTTP/1.1 401 Unauthorized');
-	die('Invalid Login');
-}
 
 function my_debug($message){
 	json_ok(["message"=>"\1"]);
