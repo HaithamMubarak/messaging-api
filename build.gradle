@@ -99,17 +99,20 @@ tasks.register("originServiceBuild", Exec) {
     }
 }
 
-// Run container with mounted folder
-tasks.register("originServiceRun", Exec) {
+tasks.register("chmodHostDir", Exec) {
+    onlyIf { !isWindows }
     doFirst {
         println ">>> Preparing host data directory: ${hostDataDir}"
         mkdir(hostDataDir)
-        println ">>> Executing: docker run -d -p 8080:80 --name origin-service -v ${hostDataDir}:${containerDataDir} messaging-api:origin-service"
     }
+    commandLine 'chmod', '777', hostDataDir
+}
 
-    if (!isWindows)
-    {
-        commandLine 'chmod', '777', hostDataDir
+// Run container with mounted folder
+tasks.register("originServiceRun", Exec) {
+    dependsOn("chmodHostDir")
+    doFirst {
+        println ">>> Executing: docker run -d -p 8080:80 --name origin-service -v ${hostDataDir}:${containerDataDir} messaging-api:origin-service"
     }
 
     commandLine shellCommand("""
