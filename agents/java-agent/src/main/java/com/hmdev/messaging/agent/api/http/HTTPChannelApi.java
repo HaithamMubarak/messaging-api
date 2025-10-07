@@ -1,7 +1,10 @@
 package com.hmdev.messaging.agent.api.http;
 
-import com.hmdev.messaging.agent.security.MySecurity;
-import com.hmdev.messaging.agent.security.PemIO;
+
+import com.hmdev.messaging.common.ApiResponse;
+import com.hmdev.messaging.common.HttpClient;
+import com.hmdev.messaging.common.security.MySecurity;
+import com.hmdev.messaging.common.security.PemIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,9 +18,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.hmdev.messaging.agent.api.ConnectionChannelApi;
-import com.hmdev.messaging.agent.util.ApiResponse;
-import com.hmdev.messaging.agent.util.HttpClient;
-import com.hmdev.messaging.agent.util.ApiResponse.Status;
+
 
 
 public class HTTPChannelApi implements ConnectionChannelApi {
@@ -73,7 +74,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
 
             JSONObject data = apiResponse.asJsonResponse().getJsonData().optJSONObject("data");
 
-            return new ApiResponse(Status.SUCCESS, data);
+            return new ApiResponse(ApiResponse.Status.SUCCESS, data);
 
         } else {
             return apiResponse;
@@ -117,7 +118,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
 
             }
 
-            return new ApiResponse(Status.SUCCESS, dataArray.toString(), receivedJson.optIntegerObject("updateLength"));
+            return new ApiResponse(ApiResponse.Status.SUCCESS, dataArray.toString(), receivedJson.optIntegerObject("updateLength"));
 
         } else {
             return apiResponse;
@@ -135,7 +136,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
 
             String dataJson = apiResponse.asJsonResponse().getJsonData().optJSONArray("data").toString();
 
-            return new ApiResponse(Status.SUCCESS, dataJson);
+            return new ApiResponse(ApiResponse.Status.SUCCESS, dataJson);
 
         } else {
             return apiResponse;

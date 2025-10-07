@@ -1,7 +1,6 @@
 package com.hmdev.messaging.agent.api;
 
-
-import com.hmdev.messaging.agent.util.ApiResponse;
+import com.hmdev.messaging.common.ApiResponse;
 
 public interface ConnectionChannelApi {
 

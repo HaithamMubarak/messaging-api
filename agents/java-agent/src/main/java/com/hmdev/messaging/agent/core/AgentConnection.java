@@ -3,9 +3,12 @@ package com.hmdev.messaging.agent.core;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hmdev.messaging.agent.data.AgentRecord;
-import com.hmdev.messaging.agent.data.MessageEvent;
-import com.hmdev.messaging.agent.data.MessageEventResult;
+
+import com.hmdev.messaging.common.ApiResponse;
+import com.hmdev.messaging.common.CommonUtils;
+import com.hmdev.messaging.common.data.AgentRecord;
+import com.hmdev.messaging.common.data.EventMessage;
+import com.hmdev.messaging.common.data.EventMessageResult;
 import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
@@ -16,13 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import com.hmdev.messaging.agent.util.SessionRecoveryUtility;
+import com.hmdev.messaging.agent.util.Utils;
 
 import com.hmdev.messaging.agent.api.ConnectionChannelApi;
 import com.hmdev.messaging.agent.api.ConnectionChannelApiFactory;
-import com.hmdev.messaging.agent.util.ApiResponse;
-import com.hmdev.messaging.agent.util.ApiResponse.Status;
-import com.hmdev.messaging.agent.util.Utils;
+
 import org.json.JSONObject;
 
 /**
@@ -82,11 +83,11 @@ public class AgentConnection {
         }
 
         if (this.sessionId == null && checkLastSession) {
-            this.sessionId = SessionRecoveryUtility.loadSessionId(channelName);
+            this.sessionId = Utils.loadSessionId(channelName);
         }
         ApiResponse connectResponse = channelApi.connect(channelName, channelPassword, this.agentName, this.sessionId);
 
-        if (connectResponse.status() == Status.SUCCESS) {
+        if (connectResponse.status() == ApiResponse.Status.SUCCESS) {
 
             JSONObject jsonObject = connectResponse.getJsonData();
             logger.debug("Connection Response is " + jsonObject);
@@ -95,7 +96,7 @@ public class AgentConnection {
             readyState = true;
             logger.debug("Connected to session : " + this.sessionId);
 
-            SessionRecoveryUtility.saveSessionId(channelName, this.sessionId);
+            Utils.saveSessionId(channelName, this.sessionId);
             return true;
         } else {
             logger.debug("Unable to connect: " + connectResponse.getData());
@@ -129,7 +130,7 @@ public class AgentConnection {
      * @param end   ending index (inclusive) per API semantics
      * @return list of message events
      */
-    public MessageEventResult receive(long start, long end) {
+    public EventMessageResult receive(long start, long end) {
         logger.debug("ConnectionChannel.receive: " + start + " -  " + end);
         if (!readyState || sessionId == null) {
             logger.debug("Channel is not ready for receive mode.");
@@ -138,18 +139,18 @@ public class AgentConnection {
 
         ApiResponse revResponse = channelApi.receive(sessionId, start + "-" + end);
 
-        if (revResponse.status() == Status.SUCCESS) {
+        if (revResponse.status() == ApiResponse.Status.SUCCESS) {
             try {
-                List<MessageEvent> events = mapper.readValue(revResponse.getData(), new TypeReference<>() {
+                List<EventMessage> events = mapper.readValue(revResponse.getData(), new TypeReference<>() {
                 });
-                return new MessageEventResult(events, revResponse.getUpdateLength());
+                return new EventMessageResult(events, revResponse.getUpdateLength());
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
         } else {
             logger.debug("Receive Error: " + revResponse.getData());
         }
-        return new MessageEventResult(new ArrayList<>(), 0);
+        return new EventMessageResult(new ArrayList<>(), 0);
     }
 
     /**
@@ -168,7 +169,7 @@ public class AgentConnection {
 
         ApiResponse revResponse = channelApi.getActiveAgents(sessionId);
 
-        if (revResponse.status() == Status.SUCCESS) {
+        if (revResponse.status() == ApiResponse.Status.SUCCESS) {
             try {
                 return mapper.readValue(revResponse.getData(), new TypeReference<>() {
                 });
@@ -241,7 +242,7 @@ public class AgentConnection {
         }
 
         ApiResponse connectResponse = channelApi.send(msg, asFilterRegex ? destination : Pattern.quote(destination), sessionId);
-        return connectResponse.status() == Status.SUCCESS;
+        return connectResponse.status() == ApiResponse.Status.SUCCESS;
     }
 
     public static class RunnableReceive implements Runnable {
@@ -264,11 +265,11 @@ public class AgentConnection {
 
             while (channel.readyState) {
 
-                MessageEventResult messageEventResult = channel.receive(start, end);
+                EventMessageResult messageEventResult = channel.receive(start, end);
 
                 if (messageEventResult != null) {
 
-                    List<MessageEvent> events = messageEventResult.getMessageEvents();
+                    List<EventMessage> events = messageEventResult.getMessageEvents();
                     if (!events.isEmpty()) {
                         messageHandler.onMessageEvents(events);
                     }
@@ -279,7 +280,7 @@ public class AgentConnection {
                     end += dataLength;
                 }
 
-                Utils.sleep(1000);
+                CommonUtils.sleep(1000);
             }
         }
 

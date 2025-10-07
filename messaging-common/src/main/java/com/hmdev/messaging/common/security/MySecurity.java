@@ -1,29 +1,19 @@
-package com.hmdev.messaging.agent.security;
+package com.hmdev.messaging.common.security;
 
+import com.hmdev.messaging.agent.common.security.aes.AesCtr;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.KeySpec;
-import java.util.Base64;
-import java.util.Objects;
-
-import org.apache.commons.io.IOUtils;
-import org.json.JSONObject;
-
-import com.hmdev.messaging.agent.security.aes.AesCtr;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.spec.KeySpec;
+import java.util.Base64;
+import java.util.Objects;
 
 public final class MySecurity {
     private MySecurity() { /* no instances */ }

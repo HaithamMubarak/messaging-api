@@ -2,6 +2,24 @@ plugins {
     id 'base'
 }
 
+allprojects {
+    group = 'com.hmdev.messaging'
+    version = '1.0.0'
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    sourceCompatibility = '11'
+    targetCompatibility = '11'
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}
+
 def artifactDir = layout.buildDirectory.dir("artifacts")
 
 // Pick up messagingApiUrl from command line (-P) or settings.gradle (default)
@@ -42,7 +60,7 @@ tasks.register("copyJsAgent", Copy) {
     filesMatching("**/init-agent.js") {
         filter { line ->
             line.replaceAll(/window\.messagingApiUrl\s*=\s*['"].*?['"];/,
-                    "window.messagingApiUrl = '${ext.messagingApiUrl}';")
+                    "window.messagingApiUrl = '${rootProject.ext.messagingApiUrl}';")
         }
     }
 }

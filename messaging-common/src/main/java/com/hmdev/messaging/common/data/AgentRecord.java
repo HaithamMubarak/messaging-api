@@ -1,4 +1,4 @@
-package com.hmdev.messaging.agent.data;
+package com.hmdev.messaging.common.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

@@ -3,9 +3,9 @@ package com.hmdev.messaging.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.hmdev.messaging.agent.core.AgentConnection;
-import com.hmdev.messaging.agent.data.AgentRecord;
-import com.hmdev.messaging.agent.data.MessageEvent;
-import com.hmdev.messaging.agent.util.Utils;
+import com.hmdev.messaging.common.CommonUtils;
+import com.hmdev.messaging.common.data.AgentRecord;
+import com.hmdev.messaging.common.data.EventMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,16 +58,16 @@ public class Main {
 
                 try {
                     logger.info("New Message events:");
-                    for (MessageEvent messageEvent : messageEvents) {
+                    for (EventMessage messageEvent : messageEvents) {
                         logger.info("MessageEvent: {}", mapper.writeValueAsString(messageEvent));
                     }
 
                     // sample code to handle special prompts
                     if (messageEvents.stream()
                             .filter(event -> event.getDate() > agentConnection.getConnectionTime())
-                            .map(MessageEvent::getContent).filter(Objects::nonNull).map(String::trim).anyMatch(EXIT_COMMAND::equals)) {
+                            .map(EventMessage::getContent).filter(Objects::nonNull).map(String::trim).anyMatch(EXIT_COMMAND::equals)) {
                         agentConnection.sendMessage("Bye bye from your Java Agent - have a great day! :)");
-                        Utils.sleep(2000);
+                        CommonUtils.sleep(2000);
                         latch.countDown();
                     }
                 } catch (Exception e) {

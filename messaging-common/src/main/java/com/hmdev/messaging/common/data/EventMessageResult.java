@@ -1,4 +1,5 @@
-package com.hmdev.messaging.agent.data;
+package com.hmdev.messaging.common.data;
+
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,9 +8,9 @@ import java.util.List;
 
 @Data
 @AllArgsConstructor
-public class MessageEventResult {
+public class EventMessageResult {
 
-    private List<MessageEvent> messageEvents;
+    private List<EventMessage> messageEvents;
     private long updateLength;
 
 }

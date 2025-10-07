@@ -1,8 +1,8 @@
-package com.hmdev.messaging.agent.security.aes;
+package com.hmdev.messaging.common.security.aes;
 
+import com.hmdev.messaging.agent.common.security.aes.Aes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -13,7 +13,6 @@ import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Base64;
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */

@@ -1,10 +1,8 @@
-package com.hmdev.messaging.agent.util;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+package com.hmdev.messaging.common;
 
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**

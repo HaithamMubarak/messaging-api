@@ -1,9 +1,10 @@
-package com.hmdev.messaging.agent.util;
+package com.hmdev.messaging.common;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+import javax.net.ssl.HttpsURLConnection;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.InputStreamReader;
@@ -11,10 +12,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
-
-import javax.net.ssl.HttpsURLConnection;
 
 
 public class HttpClient {
@@ -88,7 +86,7 @@ public class HttpClient {
 
         if (requests > requestsLimit) {
             enabled = false;
-            Utils.sleep(5000);
+            CommonUtils.sleep(5000);
             enabled = true;
             requests = 0;
 
