@@ -89,7 +89,7 @@ It is based on a lightweight **Apache + PHP** environment and contains:
   This directory is created on the host during container startup and mounted into the container.
 - **API endpoints** served via Apache:
     - `/origin-service?action=connect`
-    - `/origin-service?action=active-agents`
+    - `/origin-service?action=list-agents`
     - `/origin-service?action=receive`
     - `/origin-service?action=event`
     - `/origin-service?action=disconnect`

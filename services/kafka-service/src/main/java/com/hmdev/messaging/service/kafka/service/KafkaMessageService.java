@@ -3,20 +3,21 @@ package com.hmdev.messaging.service.kafka.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
+import com.hmdev.messaging.common.data.Range;
 import com.hmdev.messaging.common.service.EventMessageService;
+import com.hmdev.messaging.service.kafka.utils.KafkaUtils;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -53,8 +54,7 @@ public class KafkaMessageService implements EventMessageService {
 
             String payload = mapper.writeValueAsString(event);
 
-            var future = kafkaTemplate.send(channelId, channelId, payload);
-            var result = future.get(10, TimeUnit.SECONDS);
+            SendResult<String, String> result = kafkaTemplate.send(channelId, channelId, payload).get(10, TimeUnit.SECONDS);
 
             if (result != null && result.getRecordMetadata() != null) {
                 LOGGER.debug(
@@ -72,7 +72,7 @@ public class KafkaMessageService implements EventMessageService {
     }
 
     @Override
-    public EventMessageResult receive(String channelId,String from, long startOffset, long endOffset) {
+    public EventMessageResult receive(String channelId, String target, Range range) {
 
         List<EventMessage> events = new ArrayList<>();
         long updateLength = 0;
@@ -86,6 +86,9 @@ public class KafkaMessageService implements EventMessageService {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "range-reader-" + UUID.randomUUID());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+
+        long startOffset = range.getStart();
+        long endOffset = range.getEnd();
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
             List<TopicPartition> partitions = consumer.partitionsFor(channelId).stream()
@@ -103,13 +106,12 @@ public class KafkaMessageService implements EventMessageService {
 
                 for (ConsumerRecord<String, String> rec : records) {
                     if (rec.offset() >= startOffset && rec.offset() <= endOffset) {
-                        updateLength ++;
+                        updateLength++;
                         try {
                             EventMessage event = mapper.readValue(rec.value(), EventMessage.class);
 
                             // check from matcher
-                            if (from == null || event.getFrom().matches(from))
-                            {
+                            if (matchesTarget(event.getFrom(), target)) {
                                 events.add(event);
                             }
 
@@ -144,7 +146,7 @@ public class KafkaMessageService implements EventMessageService {
 
     private void setupTopic(String topicName) {
         try {
-            if (!topicExists(adminClient, topicName)) {
+            if (!KafkaUtils.topicExists(adminClient, topicName)) {
                 NewTopic topic = new NewTopic(topicName, partitions, replicationFactor);
                 adminClient.createTopics(Collections.singletonList(topic))
                         .all().get(5, TimeUnit.SECONDS);
@@ -153,22 +155,11 @@ public class KafkaMessageService implements EventMessageService {
             }
         } catch (Exception e) {
             LOGGER.error("[Kafka] Error ensuring topic exists '{}': {}", topicName, e.getMessage(), e);
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
-    private boolean topicExists(AdminClient adminClient, String topicName) {
-        try {
-            adminClient.describeTopics(Collections.singletonList(topicName)).allTopicNames().get(3, TimeUnit.SECONDS);
-            return true;
-        } catch (ExecutionException e) {
-            if (e.getCause() instanceof UnknownTopicOrPartitionException) {
-                return false;
-            }
-            LOGGER.error("[Kafka] Error describing topic '{}': {}", topicName, e.getMessage(), e);
-            throw new RuntimeException("Error describing topic: " + e.getMessage(), e);
-        } catch (Exception e) {
-            LOGGER.error("[Kafka] Failed to check topic existence '{}': {}", topicName, e.getMessage(), e);
-            throw new RuntimeException("Failed to check topic existence: " + e.getMessage(), e);
-        }
+    private boolean matchesTarget(String from, String target) {
+        return from.equals(target) || from.matches(target);
     }
 }

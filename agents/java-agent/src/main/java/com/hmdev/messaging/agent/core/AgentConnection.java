@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.hmdev.messaging.common.ApiResponse;
 import com.hmdev.messaging.common.CommonUtils;
-import com.hmdev.messaging.common.data.AgentRecord;
+import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
 import lombok.Getter;
@@ -154,11 +154,11 @@ public class AgentConnection {
     }
 
     /**
-     * Gets all active agents
+     * Gets all agents
      *
-     * @return return the list of all active agents
+     * @return return the list of all agents
      */
-    public List<AgentRecord> getActiveAgents() {
+    public List<AgentInfo> getActiveAgents() {
 
         logger.debug("ConnectionChannel.getActiveAgents: ");
 
@@ -223,7 +223,6 @@ public class AgentConnection {
     public boolean sendMessage(String msg) {
         return sendMessage(msg, ".*", true);
     }
-
 
     /**
      * Send a message to destination, optionally marking destination as a regex filter.

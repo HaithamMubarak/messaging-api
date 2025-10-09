@@ -9,7 +9,7 @@ They **never decrypt** messages — only forward encrypted events.
 - Current relay implementation (PHP/Apache).  
 - Provides endpoints for:
   - `connect`  
-  - `active-agents`  
+  - `list-agents`  
   - `receive`  
   - `event`  
   - `disconnect`  

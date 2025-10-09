@@ -20,7 +20,6 @@ import org.json.JSONObject;
 import com.hmdev.messaging.agent.api.ConnectionChannelApi;
 
 
-
 public class HTTPChannelApi implements ConnectionChannelApi {
     private static final Logger logger = LoggerFactory.getLogger(HTTPChannelApi.class);
 
@@ -64,7 +63,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
         jsonObject.put("channelPassword", MySecurity.hash(channelKey, this.channelSecret));
         jsonObject.put("agentName", agentName);
         jsonObject.put("agentContext", createAgentContext());
-        jsonObject.put("session", sessionId);
+        jsonObject.put("sessionId", sessionId);
 
         String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
 
@@ -82,11 +81,16 @@ public class HTTPChannelApi implements ConnectionChannelApi {
     }
 
     @Override
-    public ApiResponse receive(String session, String range) {
+    public ApiResponse receive(String session, long start, long end) {
 
         JSONObject jsonObject = new JSONObject();
-        jsonObject.put("session", session);
-        jsonObject.put("range", range);
+        jsonObject.put("sessionId", session);
+
+        JSONObject rangeJson = new JSONObject();
+        rangeJson.put("start", start);
+        rangeJson.put("end", end);
+
+        jsonObject.put("range", rangeJson);
 
         String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
 
@@ -109,13 +113,12 @@ public class HTTPChannelApi implements ConnectionChannelApi {
                         item = new JSONObject();
                     } else {
                         item.remove("content");
-                        item.remove("encrypted");
                         item.put("content", plain);
+                        item.put("encrypted", false);
                     }
                 }
 
                 dataArray.put(item);
-
             }
 
             return new ApiResponse(ApiResponse.Status.SUCCESS, dataArray.toString(), receivedJson.optIntegerObject("updateLength"));
@@ -128,9 +131,9 @@ public class HTTPChannelApi implements ConnectionChannelApi {
     @Override
     public ApiResponse getActiveAgents(String session) {
         JSONObject jsonObject = new JSONObject();
-        jsonObject.put("session", session);
+        jsonObject.put("sessionId", session);
 
-        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("active-agents"), jsonObject.toString());
+        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("list-agents"), jsonObject.toString());
 
         if (apiResponse.status() == ApiResponse.Status.SUCCESS) {
 
@@ -151,7 +154,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
         msgPayload.put("to", destAgent);
         msgPayload.put("encrypted", true);
         msgPayload.put("content", new JSONObject(MySecurity.encryptAndSign(msg, channelSecret)));
-        msgPayload.put("session", session);
+        msgPayload.put("sessionId", session);
 
         String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, msgPayload.toString());
 
@@ -162,7 +165,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
     public ApiResponse disconnect(String session) {
 
         JSONObject jsonObject = new JSONObject();
-         jsonObject.put("session", session);
+        jsonObject.put("sessionId", session);
 
         String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
 
@@ -180,11 +183,10 @@ public class HTTPChannelApi implements ConnectionChannelApi {
     }
 
     private String getActionUrl(String action) {
-        return "/" + "?use-pubkey=" + usePublicKey + "&action=" + action;
+        return String.format("/%s?use-pubkey=%s", action, usePublicKey);
     }
 
-    private JSONObject createAgentContext()
-    {
+    private JSONObject createAgentContext() {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("agentType", "JAVA-AGENT");
         jsonObject.put("descriptor", HTTPChannelApi.class.getName());

@@ -8,7 +8,7 @@ public interface ConnectionChannelApi {
 
     ApiResponse connect(String channelName, String channelKey, String agentName, String sessionId) throws Exception;
 
-    ApiResponse receive(String session, String range);
+    ApiResponse receive(String session, long start, long end);
 
     ApiResponse getActiveAgents(String session);
 

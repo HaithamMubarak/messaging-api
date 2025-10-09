@@ -1,6 +1,6 @@
 package com.hmdev.messaging.common.security;
 
-import com.hmdev.messaging.agent.common.security.aes.AesCtr;
+import com.hmdev.messaging.common.security.aes.AesCtr;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +11,8 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 import java.util.Objects;
@@ -66,17 +68,29 @@ public final class MySecurity {
 
     }
 
-    public static String deriveChannelSecret(String channelName, String password) throws Exception {
+    public static String deriveChannelSecret(String channelName, String password)  {
         String combined = channelName + password;
         byte[] salt = "messaging-api".getBytes(); // must match JS salt
         int iterations = 100_000;
         int keyLength = 256; // bits
 
         KeySpec spec = new PBEKeySpec(combined.toCharArray(), salt, iterations, keyLength);
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        SecretKeyFactory factory = null;
+        try {
+            factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
 
-        byte[] keyBytes = factory.generateSecret(spec).getEncoded();
-        return Base64.getEncoder().encodeToString(keyBytes); // same format as JS
+        byte[] keyBytes = null;
+        try {
+            keyBytes = factory.generateSecret(spec).getEncoded();
+        } catch (InvalidKeySpecException e) {
+            throw new RuntimeException(e);
+        }
+        return "channel-" + Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(keyBytes);
     }
 
     public static String blocksEncrypt(Cipher encryptor, String plain) {

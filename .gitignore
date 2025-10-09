@@ -1,5 +1,7 @@
 .gradle
 .idea
+build
+logs
 /build/
 agents/java-agent/build
 **/__pycache__/

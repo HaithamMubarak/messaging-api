@@ -11,7 +11,6 @@ import com.hmdev.messaging.agent.api.http.HTTPChannelApi;
 public abstract class ConnectionChannelApiFactory {
     private static final Logger logger = LoggerFactory.getLogger(ConnectionChannelApiFactory.class);
 
-	
 	private ConnectionChannelApiFactory(){
 		super();
 	}

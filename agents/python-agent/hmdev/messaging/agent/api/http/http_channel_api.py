@@ -20,17 +20,20 @@ class HTTPChannelApi(ConnectionChannelApi):
         self.channel_secret = None
 
     def _url(self, action: str) -> str:
-        return f"/?use-pubkey={str(self.use_public_key).lower()}&action={action}"
+        return f"/{action}?use-pubkey={str(self.use_public_key).lower()}"
 
     def connect(self, channel_name: str, channel_key: str, agent_name: str, session_id: Optional[str] = None) -> ApiResponse:
         self.channel_secret = MySecurity.derive_channel_secret(channel_name, channel_key)
 
-        payload = {"channelName": channel_name, "channelPassword": MySecurity.hash(channel_key, self.channel_secret),
-                   "agentName": agent_name,
-                   "agentContext": self.create_agent_context()}
+        payload = {
+            "channelName": channel_name,
+            "channelPassword": MySecurity.hash(channel_key, self.channel_secret),
+            "agentName": agent_name,
+            "agentContext": self.create_agent_context()
+        }
 
         if session_id:
-            payload["session"] = session_id
+            payload["sessionId"] = session_id
         try:
             txt = self.client.request("POST", self._url("connect"), json_body=payload)
             data = json.loads(txt)['data']
@@ -38,14 +41,14 @@ class HTTPChannelApi(ConnectionChannelApi):
         except Exception as e:
             return ApiResponse(Status.ERROR, str(e))
 
-    def receive(self, session: str, range_str: str) -> ApiResponse:
-        params = {"session": session, "range": range_str}
+    def receive(self, session: str, start: int, end : int) -> ApiResponse:
+        params = {"sessionId": session, "range": {"start": start, "end": end}}
         try:
             txt = self.client.request("POST", self._url("receive"), json_body=params)
-            # Expecting JSON list and optional updateLength
-            try:
-                obj = json.loads(txt)
 
+            # Expecting JSON list and optional updateLength
+            obj = json.loads(txt)
+            if obj['status'] == 'success':
                 obj = obj['data']
                 cipher_array = obj.get("events", [])
                 data_array = []
@@ -65,17 +68,16 @@ class HTTPChannelApi(ConnectionChannelApi):
 
                 if isinstance(obj, dict) and "updateLength" in obj:
                     return ApiResponse(Status.SUCCESS, json.dumps(data_array), obj.get("updateLength"))
-            except Exception as exception:
-                logger.warning(exception)
-                pass
+
             return ApiResponse(Status.SUCCESS, txt)
-        except Exception as e:
-            return ApiResponse(Status.ERROR, str(e))
+        except Exception as exception:
+            logger.warning(exception)
+            return ApiResponse(Status.ERROR, str(exception))
 
     def get_active_agents(self, session: str) -> ApiResponse:
-        params = {"session": session}
+        params = {"sessionId": session}
         try:
-            txt = self.client.request("POST", self._url("active-agents"), json_body=params)
+            txt = self.client.request("POST", self._url("list-agents"), json_body=params)
             # Expecting JSON list and optional updateLength
             try:
                 obj = json.loads(txt)
@@ -93,7 +95,7 @@ class HTTPChannelApi(ConnectionChannelApi):
             "to" : to_agent,
             "encrypted" : True,
             "content": json.loads(MySecurity.encrypt_and_sign(msg, self.channel_secret)),
-            "session": session
+            "sessionId": session
         }
         try:
             txt = self.client.request("POST", self._url("event"), json_body=payload)
@@ -102,7 +104,7 @@ class HTTPChannelApi(ConnectionChannelApi):
             return ApiResponse(Status.ERROR, str(e))
 
     def disconnect(self, channel_key: str, session: str) -> ApiResponse:
-        payload = {"key": channel_key, "session": session}
+        payload = {"key": channel_key, "sessionId": session}
         try:
             txt = self.client.request("POST", self._url("disconnect"), json_body=payload)
             self.client.close_all()

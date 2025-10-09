@@ -62,8 +62,7 @@ class AgentConnection:
     def receive(self, start: int, end: int) -> Optional[ApiResponse]:
         if not (self._ready_state and self._session_id and self._channel_password):
             return None
-        rng = f"{start}-{end}"
-        resp = self._channel_api.receive( self._session_id, rng)
+        resp = self._channel_api.receive( self._session_id, start, end)
         return resp
 
     def receive_async(self, handler: AgentConnectionEventHandler) -> None:

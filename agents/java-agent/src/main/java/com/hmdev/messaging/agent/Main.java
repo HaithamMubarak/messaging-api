@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.hmdev.messaging.agent.core.AgentConnection;
 import com.hmdev.messaging.common.CommonUtils;
-import com.hmdev.messaging.common.data.AgentRecord;
+import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.data.EventMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +48,7 @@ public class Main {
         try {
             agentConnection.connect(channel, password);
 
-            List<AgentRecord> agentsResults = agentConnection.getActiveAgents();
+            List<AgentInfo> agentsResults = agentConnection.getActiveAgents();
             logger.info("agentsResults: {}", agentsResults);
 
             boolean sendMessageResult = agentConnection.sendMessage("Hello, I am " + agentName);

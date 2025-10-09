@@ -1,30 +1,38 @@
 package com.hmdev.messaging.common.session;
 
-import java.util.Map;
+import com.hmdev.messaging.common.data.AgentInfo;
+
+import java.util.List;
 
 /**
- * Generic session manager contract.
- * Implementations can use Kafka, Redis, in-memory, etc.
+ * Generic interface for managing agent sessions and channels.
+ * Implementations may use Kafka, Redis, in-memory, etc.
  */
 public interface GenericSessionManager {
 
     /**
-     * Store or update a session mapping.
+     * Stores a new agent session.
+     * Associates both sessionId → AgentInfo and channelId → List<AgentInfo>.
      */
-    <T> boolean put(String sessionId, T data);
+    void putSession(String sessionId, SessionInfo info);
 
     /**
-     * Retrieve a session mapping (from cache or backend).
+     * Retrieves a single AgentInfo by session ID.
+     * @param sessionId session identifier
+     * @return AgentInfo or null if not found
      */
-    <T> T get(String sessionId, Class<T> type);
+    SessionInfo getSession(String sessionId);
 
     /**
-     * Remove a session mapping.
+     * Retrieves all agents associated with a specific channel ID.
+     * @param channelId channel identifier
+     * @return list of AgentInfo (possibly empty)
      */
-    boolean remove(String sessionId);
+    List<AgentInfo> getAgentsByChannel(String channelId);
 
     /**
-     * For diagnostics — returns cached session snapshot.
+     * Removes an agent session completely from both session and channel mappings.
+     * Also triggers removal from persistence (Kafka, Redis, etc.)
      */
-    Map<String, Object> getAllCached();
+    void removeSession(String sessionId);
 }

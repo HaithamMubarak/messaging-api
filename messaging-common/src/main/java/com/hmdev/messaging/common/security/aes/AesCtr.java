@@ -1,6 +1,5 @@
 package com.hmdev.messaging.common.security.aes;
 
-import com.hmdev.messaging.agent.common.security.aes.Aes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

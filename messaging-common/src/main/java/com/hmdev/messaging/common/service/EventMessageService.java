@@ -3,6 +3,7 @@ package com.hmdev.messaging.common.service;
 
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
+import com.hmdev.messaging.common.data.Range;
 
 
 public interface EventMessageService {
@@ -15,15 +16,15 @@ public interface EventMessageService {
     /**
      * Receives messages for a channel by offset range.
      */
-    default EventMessageResult receive(String channelId, long startOffset, long endOffset)
+    default EventMessageResult receive(String channelId, Range range)
     {
-        return receive(channelId, null, startOffset, endOffset);
+        return receive(channelId, null, range);
     }
 
     /**
      * Receives messages for a channel by source and offset range.
      */
-    EventMessageResult receive(String channelId, String from, long startOffset, long endOffset);
+    EventMessageResult receive(String channelId, String toDest, Range range);
 
     /**
      * Cleans the channel related resources

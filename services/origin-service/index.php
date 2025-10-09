@@ -37,6 +37,9 @@ set_time_limit(5 * 30);
 
 header("Access-Control-Allow-Origin: *");
 
+$requestUri = rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+if ($requestUri === '') $requestUri = '/';
+
 $action = isset($_GET["action"])?htmlspecialchars($_GET["action"]):"";
 $usePubKey = strtolower((isset($_GET["use-pubkey"]) ? $_GET["use-pubkey"]:'false')) == 'true';
 
@@ -80,85 +83,68 @@ try{
 
 	$controller = new ChannelController($data->session);
 
-	switch($action){
+	switch ($requestUri) {
+    case '/agents-info':
+        $controller->connect();
+        $data->channelPassword = $controller->getChannelPassword();
+        $response = $controller->getAgentInfo($data->agentName);
+        json_ok(json_encode($response));
+        break;
 
-		case 'agent-info':
+    case '/list-agents':
+        $controller->connect();
+        $data->channelPassword = $controller->getChannelPassword();
+        $receivedData = $controller->getActiveAgents();
+        json_ok(json_encode($receivedData));
+        break;
 
-			$controller->connect();
-			$data->channelPassword = $controller->getChannelPassword();
-			$response = $controller->getAgentInfo($data->agentName);
+    case '/connect':
+        $newSession = $controller->setupSession($data->channelName,$data->channelPassword,$data->agentName, $data->agentContext);
+        $controller->connect();
+        $sessionId = $controller->sessionId;
+        $channelId = $controller->channelId;
+        $activeAgents = $controller->getActiveAgents();
+        if(sizeof($activeAgents) <= 1){
+            $controller->dispatch('clear-events');
+        }
+        if ($newSession) {
+            $controller->dispatch('connect');
+        } else {
+            $controller->dispatch('re-connect');
+        }
+        $connectResponse = json_encode([
+            "channelId" => $channelId,
+            "sessionId" => $sessionId,
+            "role" => $role,
+            "date" => getCurrentTime()
+        ]);
+        json_ok($connectResponse);
+        break;
 
-			json_ok(json_encode($response));
-			break;
-		case 'active-agents':
+    case '/event':
+        $controller->connect();
+        $controller->dispatch($data);
+        json_ok(null, "Success");
+        break;
 
-			$controller->connect();
+    case '/receive':
+        $controller->connect();
+        $data->channelPassword = $controller->getChannelPassword();
+        $receivedData = $controller->receive($data->range);
+        json_ok(json_encode($receivedData));
+        break;
 
-			$data->channelPassword = $controller->getChannelPassword();
+    case '/disconnect':
+        $controller->connect($data->session);
+        $controller->dispatch('disconnect');
+        $controller->disconnect();
+        json_ok(null, "Success");
+        break;
 
-			$receivedData = $controller->getActiveAgents();
-
-			json_ok(json_encode($receivedData));
-			break;
-		case 'connect' :
-
-			$newSession = $controller->setupSession($data->channelName,$data->channelPassword,$data->agentName, $data->agentContext);
-
-			$controller->connect();
-
-			$sessionId = $controller->sessionId;
-			$channelId = $controller->channelId;
-
-			$activeAgents = $controller->getActiveAgents();
-
-			if(sizeof($activeAgents) <= 1){
-				$controller->dispatch('clear-events');
-			}
-
-            if ($newSession)
-            {
-			    $controller->dispatch('connect');
-            }
-            else
-            {
-                $controller->dispatch('re-connect');
-            }
-            $connectResponse = json_encode([
-                    "channelId" => $channelId,
-                    "sessionId" => $sessionId,
-                    "role" => $role,
-                    "date" => getCurrentTime()
-            ]);
-			json_ok($connectResponse);
-		    break;
-
-		case 'event' :
-			$controller->connect();
-			$controller->dispatch($data);
-			json_ok(null, "Success");
-            break;
-
-		case 'receive' :
-			$controller->connect();
-			$data->channelPassword = $controller->getChannelPassword();
-			$receivedData = $controller->receive($data->range);
-			json_ok(json_encode($receivedData));
-		    break;
-
-		case 'disconnect' :
-			$controller->connect($data->session);
-			$controller->dispatch('disconnect');
-			$controller->disconnect();
-			json_ok(null, "Success");
-
-		    break;
-
-		default :
-			json_error('Operation Not Supported');
-		break;
-	}
-
-
+    default:
+        http_response_code(404);
+        json_error('Operation Not Supported');
+        break;
 }catch(Exception $e){
 	json_error($e->getMessage());
 }

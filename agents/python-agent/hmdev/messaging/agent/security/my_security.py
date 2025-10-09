@@ -77,7 +77,7 @@ class MySecurity:
             backend=default_backend(),
         )
         key_bytes = kdf.derive(combined)
-        return base64.b64encode(key_bytes).decode()
+        return 'channel-' + base64.urlsafe_b64encode(key_bytes).rstrip(b'=').decode('ascii')
 
     # ------------------ MD5 Hash ------------------
 

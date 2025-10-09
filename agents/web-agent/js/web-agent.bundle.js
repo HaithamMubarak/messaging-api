@@ -605,7 +605,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
     var requests = 0;
     var requests_limit = 50;
     var requests_time_period = 1500;
-    var defaultReceiveRange = "0-19";
+    var defaultReceiveRange = {start : 0 , end 19};
     var xhr_enabled = true;
     var channelKeyRegex = /[\*\/,\\\\\s]+/;
 
@@ -694,7 +694,11 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             for (let i = 0; i < bytes.byteLength; i++) {
                 binary += String.fromCharCode(bytes[i]);
             }
-            return btoa(binary);
+            let base64 = btoa(binary);
+
+            return 'channel-' + base64.replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
         }
 
     }
@@ -711,26 +715,20 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         }
     }
 
-    function ragneSeperator(range){
-        var seperator = '-';
-        if(range.indexOf('-') == -1 && range.indexOf(':') != -1){
-            seperator = ':';
-            range = range.replace(/[^1-9\.:]+/,'');
-        }else{
-            range = range.replace(/[^1-9\.-]+/,'');
-        }
-
-        return seperator;
-    }
-
-    function rangeNumber(num){
+    function rangeNumber(num) {
         num = parseInt(num);
-        return(isNaN(num) || !isFinite(num))?Infinity:num;
+        return (isNaN(num) || !isFinite(num)) ? Infinity : num;
     }
+
     function parseRange(range){
 
-        var seperator = ragneSeperator(range);
-        var start,change,end;
+        if (typeof range == 'object')
+        {
+            return range;
+        }
+
+        let seperator = range.indexOf(':') !== -1 ? ':' : '-'
+        let start,change,end;
         if(range.split(seperator).length >= 3){
             start = rangeNumber(range.split(seperator)[0]);
             change = rangeNumber(range.split(seperator)[1]);
@@ -747,17 +745,16 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             end = temp;
         }
 
-        return {min : start, change : change,max : end};
+        return {start, change, end};
     }
 
-    function updateRange(range,rangeUpdate){
-        var rangeObj = parseRange(range);
+    function updateRange(range, rangeUpdate){
+        let rangeObj = parseRange(range);
 
-        rangeObj.min += rangeUpdate;
-        rangeObj.max += rangeUpdate;
+        rangeObj.start += rangeUpdate;
+        rangeObj.end += rangeUpdate;
 
-
-        return (isFinite(rangeObj.min)?rangeObj.min:'')+"-"+(isFinite(rangeObj.max)?rangeObj.max:'');
+        return rangeObj;
     }
 
     function guid8() {
@@ -822,7 +819,8 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             typeof obj.callback == 'function' && obj.callback(response);
         });
 
-        xhr.open('get', `${getBaseUrl(obj.base)}public_key.php`, true);
+
+        xhr.open('get',  getActionUrl(obj.base, false, 'public_key.php'), true);
 
         xhr.send();
 
@@ -837,15 +835,16 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         console.log('Something went wrong, you can try to connect after 5 seconds or you can use channel.onreset function');
     }
 
-    function getBaseUrl(url){
-        if(!url || url == null){
-            return '';
-        }else if(url.endsWith('/')){
-            return url;
-        }else{
-            return url+'/';
+    function getActionUrl(url, pubkeyMode, action){
+        let baseUrl = url;
+        if(!baseUrl){
+            baseUrl = '';
         }
-
+        else if(baseUrl.endsWith('/'))
+        {
+            baseUrl = baseUrl.substring(0, baseUrl.length) - 1;
+        }
+        return `${baseUrl}/${action}?use-pubkey=${pubkeyMode}`;
     }
 
     function preparePayload(payload, pubKeyEncryptor){
@@ -974,11 +973,11 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         var url;
 
         if(method === 'get' || binData){
-            url = `${getBaseUrl(obj.base)}?use-pubkey=${!!obj.pubKeyEncryptor}&action=${action}` + (payload ? `&data=${encodeURIComponent(payload)}` : "") //, !obj.useSyncMode;
+            url = getActionUrl(obj.base, !!obj.pubKeyEncryptor, action) + (payload ? `&data=${encodeURIComponent(payload)}` : "") //, !obj.useSyncMode;
             console.log('url is ', url)
             payload = method === 'get'? binData : undefined;
         }else{
-            url = `${getBaseUrl(obj.base)}?use-pubkey=${!!obj.pubKeyEncryptor}&action=${action}` //, !obj.useSyncMode;
+            url = getActionUrl(obj.base, !!obj.pubKeyEncryptor, action) //, !obj.useSyncMode;
         }
 
         xhr.open(method, url);
@@ -1017,7 +1016,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             to : _self._agentName,
             encrypted : false,
             content : '',
-            session : session
+            sessionId : session
         };
 
         console.log('Sending payload : ');
@@ -1051,11 +1050,10 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         var payload = preparePayload({
             filename : filename,
             type: 'file-get',
-            session : _self._session_id
+            sessionId : _self._session_id
         },_self._pubKeyEncryptor);
 
-        return `${getBaseUrl(_self._api)}/?use-pubkey=false&action=event&data=${encodeURIComponent(payload)}`;
-
+        return `${getActionUrl(_self._api, false, 'event')}&data=${encodeURIComponent(payload)}`;
     }
 
     FileSystem.prototype.download = function(filename){
@@ -1099,7 +1097,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             to : _self._agentName,
             encrypted : false,//agents encryption is disabled
             content : '',
-            session : session
+            sessionId : session
         };
 
         request({
@@ -1137,7 +1135,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             to : _self._agentName,
             encrypted : false,//agents encryption is disabled
             content : '',
-            session : session
+            sessionId : session
         };
 
         console.log('Sending payload : ');
@@ -1240,7 +1238,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                                 to : _self._agentName,
                                 encrypted : false,//agents encryption is disabled
                                 content : 'binary',//MySecurity.encryptAndSign(res.data,_self._channel_key),
-                                session : session
+                                sessionId : session
                             };
                             _self._put_xhr = request({
                                 useSyncMode : _self.useSyncMode,
@@ -1320,7 +1318,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             method : 'post',
             action : 'agent-info',
             payload : {
-                session : session,
+                sessionId : session,
                 agentName : agentName
             },
             //timeout : 10 * 60 * 1000,
@@ -1364,9 +1362,9 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             base : _self._api,
             pubKeyEncryptor : _self._pubKeyEncryptor,
             method : 'post',
-            action : 'active-agents',
+            action : 'list-agents',
             payload : {
-                session : session
+                sessionId : session
             },
             //timeout : 10 * 60 * 1000,
             id : _self._channel_id,
@@ -1462,7 +1460,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             method : 'post',
             action : 'connect',
             payload: {
-                session: config.sessionId ? config.sessionId : '',
+                sessionId : config.sessionId ? config.sessionId : '',
                 channelName: _self._channel_name,
                 channelPassword: MySecurity.hash(_self._channel_key, _self._channel_secret),
                 agentName: _self._agentName,
@@ -1546,7 +1544,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             pubKeyEncryptor:_self._pubKeyEncryptor,
             method : 'post',
             action : 'disconnect',
-            payload : {session : session},
+            payload : {sessionId : session},
             callback : function(response){
                 Channel.activeSessions = Channel.activeSessions || {};
                 delete  Channel.activeSessions[_self._session_id];
@@ -1585,7 +1583,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
     }
 
-    Channel.prototype.receive =	function (range,autoReceive){
+    Channel.prototype.receive =	function (range, autoReceive){
 
         var _self = this;
 
@@ -1604,9 +1602,6 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
         var session = _self._session_id;
 
-        //console.log('Receive Request: ');
-        //console.log({session : session, range : range });
-
         _self._receive_xhr = request({
             useSyncMode : _self.useSyncMode,
             onreset : _self.onreset,
@@ -1614,7 +1609,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             base : _self._api,
             method : 'post',
             action : 'receive',
-            payload : {session : session, range : range },
+            payload : {sessionId : session, range },
             //timeout : 5 * 60 * 1000,
             callback : function(response){
 
@@ -1696,7 +1691,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                         _self.dispatchEvent('message',{response : response});
                     }
 
-                    _self._last_receive_range = updateRange(range,rangeUpdate);
+                    _self._last_receive_range = updateRange(range, rangeUpdate);
 
                 }
 
@@ -1718,12 +1713,12 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                         _self.autoReceive = _self.autoReceive + '';
                         var rangeObj = parseRange(_self.autoReceive);
 
-                        if(rangeObj.min == Infinity || rangeObj.max == Infinity || rangeObj.min  == rangeObj.max){
+                        if(rangeObj.start == Infinity || rangeObj.end == Infinity || rangeObj.start  == rangeObj.end){
 
-                            if(rangeObj.min != Infinity){
-                                _self.autoReceive = rangeObj.min;
-                            }else if (rangeObj.max != Infinity){
-                                _self.autoReceive = rangeObj.max;
+                            if(rangeObj.start != Infinity){
+                                _self.autoReceive = rangeObj.start;
+                            }else if (rangeObj.end != Infinity){
+                                _self.autoReceive = rangeObj.end;
                             }else{
                                 _self.autoReceive = 5000;
                                 console.error('Your auto receive config \''+ _self.autoReceive +
@@ -1733,8 +1728,8 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                             additionalTimeout = _self.autoReceive;
                         }else{
                             emptyDataTimeoutChange = rangeObj.change || emptyDataTimeoutChange;
-                            empty_data_count_limit = 1 + (rangeObj.max  - rangeObj.min ) / emptyDataTimeoutChange;
-                            additionalTimeout = rangeObj.min;
+                            empty_data_count_limit = 1 + (rangeObj.end  - rangeObj.start ) / emptyDataTimeoutChange;
+                            additionalTimeout = rangeObj.start;
                         }
                     }
 
@@ -1806,7 +1801,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             to : (to && RegExp.quote(to)) || filter || '.*',
             encrypted : true,
             content : MySecurity.encryptAndSign(msg,_self._channel_secret),
-            session : session
+            sessionId : session
         };
 
         console.log('Sending payload : ');
@@ -1844,7 +1839,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             base : _self._api,
             method : 'post',
             action : 'status',
-            payload : {session : session},
+            payload : {sessionId : session},
             //timeout : 10 * 60 * 1000,
             id : _self._channel_id,
             callback : callback

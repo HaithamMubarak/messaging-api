@@ -45,7 +45,7 @@ def main():
     parser = argparse.ArgumentParser(description="Python Agent for Messaging API")
     parser.add_argument(
         "--url",
-        default="https://hmdevonline.com/messaging-api/origin-service",
+        default=" http://localhost:8080/messaging-api/kafka-service",
         help="Messaging API base URL (default: %(default)s)",
     )
     parser.add_argument("--channel", required=False, help="Channel name", default="system001")
