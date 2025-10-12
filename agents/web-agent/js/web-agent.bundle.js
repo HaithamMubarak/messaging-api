@@ -635,7 +635,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             var $myObj = {};
             $myObj.cipher = this.encrypt($message, $key);
             $myObj.hash = this.hash($message, $key);
-            return $myObj;
+            return JSON.stringify($myObj);
         },
 
         hash: (value, key) =>  {
@@ -650,11 +650,11 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                     $cipherMsg = JSON.parse($cipherMsg);
                 }
 
-                var $message = this.decrypt($cipherMsg.cipher, $key);
+                let $message = this.decrypt($cipherMsg.cipher, $key);
 
                 if(this.hash($message, $key) !== $cipherMsg.hash){
-                    return false;
-                }else{
+                    return null;
+                } else{
                     return $message;
                 }
             }catch(err){
@@ -1639,7 +1639,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                             if(item.encrypted){
                                 var plain = MySecurity.decryptAndVerify(item.content, _self._channel_secret);
 
-                                if(!plain || plain == null){
+                                if(!plain){
                                     console.log('Some corrupted data item and will be ignored');
                                     item = {};
                                 }else{

@@ -1,6 +1,7 @@
 package com.hmdev.messaging.service.kafka.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdev.messaging.common.CommonUtils;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
 import com.hmdev.messaging.common.data.Range;
@@ -111,7 +112,7 @@ public class KafkaMessageService implements EventMessageService {
                             EventMessage event = mapper.readValue(rec.value(), EventMessage.class);
 
                             // check from matcher
-                            if (matchesTarget(event.getFrom(), target)) {
+                            if (matchesTarget(event, target)) {
                                 events.add(event);
                             }
 
@@ -159,7 +160,10 @@ public class KafkaMessageService implements EventMessageService {
         }
     }
 
-    private boolean matchesTarget(String from, String target) {
-        return from.equals(target) || from.matches(target);
+    private boolean matchesTarget(EventMessage eventMessage, String target) {
+        String from = eventMessage.getFrom();
+        String to = eventMessage.getTo();
+
+        return !from.equals(target) && (CommonUtils.isEmpty(to) || to.equals(target) || target.matches(to));
     }
 }

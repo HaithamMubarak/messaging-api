@@ -1,20 +1,21 @@
 package com.hmdev.messaging.service.kafka.data;
 
 public class JsonResponse {
-    public String message;
-    public Object data;
+
     public String status;
+    public String statusMessage;
+    public Object data;
 
     private JsonResponse() {
     }
 
-    public static JsonResponse ok() {
-        return ok(null);
+    public static JsonResponse success() {
+        return success(null);
     }
 
-    public static JsonResponse ok(Object data) {
+    public static JsonResponse success(Object data) {
         JsonResponse response = new JsonResponse();
-        response.status = "ok";
+        response.status = "success";
         response.data = data;
         return response;
     }
@@ -22,14 +23,14 @@ public class JsonResponse {
     public static JsonResponse error(Object msg) {
         JsonResponse response = new JsonResponse();
         response.status = "error";
-        response.message = msg.toString();
+        response.statusMessage = msg.toString();
         return response;
     }
 
     public static JsonResponse unauthorized(String msg) {
         JsonResponse response = new JsonResponse();
         response.status = "unauthorized";
-        response.message = msg;
+        response.statusMessage = msg;
         return response;
     }
 }

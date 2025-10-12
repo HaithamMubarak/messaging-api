@@ -10,7 +10,7 @@ import java.util.List;
 @AllArgsConstructor
 public class EventMessageResult {
 
-    private List<EventMessage> messageEvents;
+    private List<EventMessage> events;
     private long updateLength;
 
 }

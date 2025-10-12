@@ -32,11 +32,11 @@ public final class MySecurity {
     public static String decryptAndVerify(String cipherMsgStr, String key) {
 
         try {
-            JSONObject $cipherMsg = new JSONObject(cipherMsgStr);
+            JSONObject cipherMsg = new JSONObject(cipherMsgStr);
 
-            String message = decrypt($cipherMsg.optString("cipher"), key);
+            String message = decrypt(cipherMsg.optString("cipher"), key);
 
-            if (!Objects.equals(hash(message, key), $cipherMsg.optString("hash"))) {
+            if (!Objects.equals(hash(message, key), cipherMsg.optString("hash"))) {
                 return null;
             } else {
                 return message;

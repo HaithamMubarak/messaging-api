@@ -24,7 +24,7 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         // Default values
-        String apiUrl = "https://hmdevonline.com/messaging-api/origin-service";
+        String apiUrl = "http://localhost:8080/messaging-api/kafka-service" ; // "https://hmdevonline.com/messaging-api/origin-service";
         String channel = "system001";
         String password = "12345678";
         String agentName = "java-agent001";

@@ -2,6 +2,7 @@ import json
 import logging
 from typing import Optional
 
+import requests
 from hmdev.messaging.agent.api.connection_channel_api import ConnectionChannelApi
 from hmdev.messaging.agent.util.api_response import ApiResponse, Status
 from hmdev.messaging.agent.util.http_client import HttpClient
@@ -44,7 +45,7 @@ class HTTPChannelApi(ConnectionChannelApi):
     def receive(self, session: str, start: int, end : int) -> ApiResponse:
         params = {"sessionId": session, "range": {"start": start, "end": end}}
         try:
-            txt = self.client.request("POST", self._url("receive"), json_body=params)
+            txt = self.client.request("POST", self._url("receive"), json_body=params, timeout=30)
 
             # Expecting JSON list and optional updateLength
             obj = json.loads(txt)
@@ -55,7 +56,7 @@ class HTTPChannelApi(ConnectionChannelApi):
 
                 for item in cipher_array:
                     if item.get("encrypted"):
-                        plain = MySecurity.decrypt_and_verify(json.dumps(item.get("content", {})), self.channel_secret)
+                        plain = MySecurity.decrypt_and_verify(item.get("content", {}), self.channel_secret)
 
                         if not plain:  # None or empty string
                             item = {}
@@ -70,6 +71,9 @@ class HTTPChannelApi(ConnectionChannelApi):
                     return ApiResponse(Status.SUCCESS, json.dumps(data_array), obj.get("updateLength"))
 
             return ApiResponse(Status.SUCCESS, txt)
+        except requests.exceptions.Timeout as timeout_exc:
+            logger.warning(f"Request timed out: {timeout_exc}")
+            return ApiResponse(Status.ERROR, "Request timed out")
         except Exception as exception:
             logger.warning(exception)
             return ApiResponse(Status.ERROR, str(exception))
@@ -94,7 +98,7 @@ class HTTPChannelApi(ConnectionChannelApi):
             "type": "chat-text",
             "to" : to_agent,
             "encrypted" : True,
-            "content": json.loads(MySecurity.encrypt_and_sign(msg, self.channel_secret)),
+            "content": MySecurity.encrypt_and_sign(msg, self.channel_secret),
             "sessionId": session
         }
         try:

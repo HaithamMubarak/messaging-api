@@ -113,6 +113,7 @@ public class HttpClient {
             con.setRequestMethod(method.value());
             con.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
             con.setRequestProperty("Accept", "*/*");
+            con.setRequestProperty("Content-Type", "application/json");
 
             if (timeout > 0) {
                 con.setConnectTimeout(timeout);

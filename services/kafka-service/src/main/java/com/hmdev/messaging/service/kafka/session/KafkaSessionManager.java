@@ -1,5 +1,6 @@
 package com.hmdev.messaging.service.kafka.session;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.session.GenericSessionManager;
@@ -14,9 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
-import org.springframework.util.concurrent.ListenableFuture;
 
 import javax.annotation.PostConstruct;
 import java.time.Duration;
@@ -30,7 +29,7 @@ public class KafkaSessionManager implements GenericSessionManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSessionManager.class);
 
     private final ConcurrentHashMap<String, SessionInfo> sessionCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, List<AgentInfo>> channelCache = new ConcurrentHashMap<>();
+    Map<String, Map<String, AgentInfo>> channelCache = new ConcurrentHashMap<>();
     private final ObjectMapper mapper = new ObjectMapper();
     private static final String SESSION_STORE_TOPIC = "session-store";
 
@@ -50,10 +49,10 @@ public class KafkaSessionManager implements GenericSessionManager {
      * Loads existing session data and then starts a background Kafka listener.
      */
     @PostConstruct
-    public void initialize() {
+    public void initialize() throws Exception {
         LOGGER.info("Initializing KafkaSessionManager...");
 
-        setupTopic(SESSION_STORE_TOPIC);
+        setupSessionTopic(SESSION_STORE_TOPIC);
 
         // Initialize cache sync at startup.
         preloadSessions();
@@ -66,12 +65,14 @@ public class KafkaSessionManager implements GenericSessionManager {
 
     @Override
     public void putSession(String sessionId, SessionInfo info) {
+        updateInternalCache(sessionId, info);
         try {
             String json = mapper.writeValueAsString(info);
-            SendResult<String, String> result = kafkaTemplate.send(SESSION_STORE_TOPIC, sessionId, json).get(3, TimeUnit.SECONDS);
-            LOGGER.debug("Session added to Kafka: {}, Kafka send result is {}", sessionId, result);
-        } catch (Exception e) {
-            LOGGER.error("Failed to publish session {}: {}", sessionId, e.getMessage());
+            kafkaTemplate.send(SESSION_STORE_TOPIC, sessionId, json).addCallback(
+                    result -> LOGGER.debug("Session added to Kafka: {}", sessionId),
+                    ex -> LOGGER.error("Failed to publish session {}: (kafka error) {}", sessionId, ex.getMessage()));
+        } catch (JsonProcessingException e) {
+            LOGGER.error("Failed to publish session {}: (JSON error) {}", sessionId, e.getMessage());
         }
     }
 
@@ -82,21 +83,19 @@ public class KafkaSessionManager implements GenericSessionManager {
 
     @Override
     public List<AgentInfo> getAgentsByChannel(String channelId) {
-        return channelCache.getOrDefault(channelId, Collections.emptyList());
+        return new ArrayList<>(channelCache.getOrDefault(channelId, Collections.emptyMap()).values());
     }
 
     @Override
     public void removeSession(String sessionId) {
-        try {
-            kafkaTemplate.send(SESSION_STORE_TOPIC, sessionId, null);
-            LOGGER.debug("Session removed from Kafka: {}", sessionId);
-        } catch (Exception e) {
-            LOGGER.error("Failed to remove session {}: {}", sessionId, e.getMessage());
-        }
+        updateInternalCache(sessionId, null);
+        kafkaTemplate.send(SESSION_STORE_TOPIC, sessionId, null).addCallback(
+                result -> LOGGER.debug("Session remove from Kafka: {}", sessionId),
+                ex -> LOGGER.error("Failed to remove session {}: (kafka error) {}", sessionId, ex.getMessage()));
     }
 
     /**
-     * Step 1️⃣: Read all existing session records from the beginning (only once).
+     * Read all existing session records from the beginning (only once).
      */
     private void preloadSessions() {
         Properties props = new Properties();
@@ -111,7 +110,7 @@ public class KafkaSessionManager implements GenericSessionManager {
             consumer.subscribe(Collections.singletonList(SESSION_STORE_TOPIC));
 
             Map<String, SessionInfo> tempSessionCache = new HashMap<>();
-            Map<String, List<AgentInfo>> tempChannelCache = new HashMap<>();
+            Map<String, Map<String, AgentInfo>> tempChannelCache = new HashMap<>();
 
             LOGGER.info("Loading existing sessions from Kafka topic '{}'...", SESSION_STORE_TOPIC);
             int emptyPolls = 0;
@@ -137,8 +136,8 @@ public class KafkaSessionManager implements GenericSessionManager {
                         tempSessionCache.put(key, sessionInfo);
 
                         tempChannelCache
-                                .computeIfAbsent(sessionInfo.getChannelId(), k -> new ArrayList<>())
-                                .add(sessionInfo.getAgentInfo());
+                                .computeIfAbsent(sessionInfo.getChannelId(), k -> new HashMap<>())
+                                .put(sessionInfo.getAgentInfo().getAgentName(), sessionInfo.getAgentInfo());
 
                     } else {
                         tempSessionCache.remove(key);
@@ -169,7 +168,6 @@ public class KafkaSessionManager implements GenericSessionManager {
 
 
     /**
-     * Step 2️⃣: Continuous Kafka listener for live updates.
      * Keeps all pod caches synchronized.
      */
     private void startKafkaCacheListener() {
@@ -186,31 +184,14 @@ public class KafkaSessionManager implements GenericSessionManager {
             LOGGER.info("SessionCacheListener subscribed to '{}'", SESSION_STORE_TOPIC);
 
             while (true) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(5));
                 for (ConsumerRecord<String, String> record : records) {
-                    String key = record.key();
+                    String sessionId = record.key();
                     String value = record.value();
-
-                    if (value != null) {
-                        SessionInfo info = mapper.readValue(value, SessionInfo.class);
-                        sessionCache.put(key, info);
-
-                        channelCache.computeIfAbsent(info.getChannelId(), k -> new ArrayList<>())
-                                .add(info.getAgentInfo());
-                        LOGGER.debug("Cache updated [ADD] session={} channel={}", key, info.getChannelId());
-                    } else {
-                        SessionInfo removed = sessionCache.remove(key);
-                        if (removed != null) {
-                            String agentName = removed.getAgentInfo().getAgentName();
-                            channelCache.computeIfPresent(removed.getChannelId(), (ch, list) -> {
-                                list.removeIf(agent -> agent.getAgentName().equals(agentName));
-                                return list.isEmpty() ? null : list;
-                            });
-                        }
-                        LOGGER.debug("Cache updated [REMOVE] session={}", key);
-                    }
+                    SessionInfo info = value != null ?  mapper.readValue(value, SessionInfo.class) : null;
+                    updateInternalCache(sessionId, info);
                 }
-                Utils.sleep(1000);
+                Utils.sleep(2000);
             }
 
         } catch (Exception e) {
@@ -218,29 +199,56 @@ public class KafkaSessionManager implements GenericSessionManager {
         }
     }
 
-    private void setupTopic(String topicName) {
-        try {
-            if (!KafkaUtils.topicExists(adminClient, topicName)) {
-                NewTopic topic = new NewTopic(topicName, 3, (short) 1)
-                        .configs(Map.of(
-                                "cleanup.policy", "compact",
-                                "min.cleanable.dirty.ratio", "0.01",
-                                "segment.ms", "600000" // 10 min segment cleanup cycle
-                        ));
+    /**
+     * Updates local session and channel caches.
+     *
+     * Adds or updates the session if {@code sessionInfo} is not null,
+     * otherwise removes it from both caches.
+     *
+     * @param sessionId    the session identifier
+     * @param sessionInfo  the session info, or null to remove it
+     */
+    private void updateInternalCache(String sessionId, SessionInfo sessionInfo)
+    {
+        if (sessionInfo != null) {
+            sessionCache.put(sessionId, sessionInfo);
 
-                adminClient.createTopics(Collections.singletonList(topic))
-                        .all()
-                        .get(10, TimeUnit.SECONDS);
+            channelCache.computeIfAbsent(sessionInfo.getChannelId(), k -> new HashMap<>())
+                    .put(sessionInfo.getAgentInfo().getAgentName(), sessionInfo.getAgentInfo());
+            LOGGER.debug("Internal Cache updated [ADD] session={} channel={}", sessionId, sessionInfo.getChannelId());
+        } else {
+            SessionInfo oldSessionInfo = sessionCache.remove(sessionId);
+            if (oldSessionInfo != null) {
+                String agentName = oldSessionInfo.getAgentInfo().getAgentName();
+                String channelName =  oldSessionInfo.getChannelId();
 
-                LOGGER.info("[Kafka] Created topic '{}' (partitions={}, replication={})",
-                        topicName, 3, 1);
-            } else {
-                LOGGER.debug("[Kafka] Topic '{}' already exists", topicName);
+                channelCache.computeIfAbsent(channelName, k -> new HashMap<>()).remove(agentName);
+
+                if (channelCache.get(channelName).isEmpty())
+                {
+                    channelCache.remove(channelName);
+                }
             }
-        } catch (Exception e) {
-            LOGGER.error("[Kafka] Error ensuring topic exists '{}': {}", topicName, e.getMessage(), e);
+            LOGGER.debug("Internal Cache updated [REMOVE] session={}", sessionId);
         }
     }
 
+    private void setupSessionTopic(String topicName) throws Exception {
+        if (!KafkaUtils.topicExists(adminClient, topicName)) {
+            NewTopic topic = new NewTopic(topicName, 3, (short) 1)
+                    .configs(Map.of(
+                            "cleanup.policy", "compact",
+                            "min.cleanable.dirty.ratio", "0.01",
+                            "segment.ms", "600000" // 10 min segment cleanup cycle
+                    ));
 
+            adminClient.createTopics(Collections.singletonList(topic))
+                    .all()
+                    .get(10, TimeUnit.SECONDS);
+
+            LOGGER.info("[Kafka] Created topic '{}'", topicName);
+        } else {
+            LOGGER.debug("[Kafka] Topic '{}' already exists", topicName);
+        }
+    }
 }

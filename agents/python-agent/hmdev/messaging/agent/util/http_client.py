@@ -29,19 +29,18 @@ class HttpClient:
             self._last_window_start = time.time()
             self._requests_in_window = 1
 
-    def request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None):
+    def request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None, timeout: int = 20):
         self._throttle()
         url = self.remote_url + path
         headers = {"User-Agent": self.USER_AGENT}
         try:
             if method.upper() == "GET":
-                r = requests.get(url, params=params or {}, headers=headers, timeout=20)
+                r = requests.get(url, params=params or {}, headers=headers, timeout=timeout)
             else:
-                r = requests.post(url, params=params or {}, json=json_body or {}, headers=headers, timeout=20)
+                r = requests.post(url, params=params or {}, json=json_body or {}, headers=headers, timeout=timeout)
             r.raise_for_status()
             return r.text
         except Exception as e:
-            logger.error("HTTP %s %s failed: %s", method, url, e)
             raise
 
     def close_all(self):

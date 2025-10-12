@@ -1,6 +1,5 @@
 package com.hmdev.messaging.service.kafka.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
@@ -36,7 +35,7 @@ public class MessagingController {
     }
 
     @PostMapping(path = "/connect", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public Object connect(@RequestBody(required = false) ConnectRequest connectRequest) throws JsonProcessingException {
+    public Object connect(@RequestBody(required = false) ConnectRequest connectRequest)  {
         long timestamp = System.currentTimeMillis();
 
         String channelId = MySecurity.deriveChannelSecret(connectRequest.getChannelName(),
@@ -46,7 +45,7 @@ public class MessagingController {
         AgentInfo agentInfo = new AgentInfo(connectRequest.getAgentName(), timestamp,
                 connectRequest.getAgentContext());
 
-        kafkaMessageService.send(channelId, new EventMessage(connectRequest.getAgentName(), "connect", false, null, timestamp));
+        kafkaMessageService.send(channelId, new EventMessage(connectRequest.getAgentName(), ".*", EventMessage.EventType.CONNECT, false, null, timestamp));
         sessionManager.putSession(sessionId, new SessionInfo(channelId, agentInfo));
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -54,7 +53,7 @@ public class MessagingController {
         payload.put("sessionId", sessionId);
         payload.put("date", timestamp);
 
-        return JsonResponse.ok(payload);
+        return JsonResponse.success(payload);
     }
 
     @PostMapping(path = "/event", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -68,11 +67,12 @@ public class MessagingController {
         // Update session timestamp
         sessionManager.putSession(eventMessageRequest.getSessionId(), sessionInfo);
 
-        kafkaMessageService.send(sessionInfo.getChannelId(),
-                new EventMessage(sessionInfo.getAgentInfo().getAgentName(), eventMessageRequest.getType(),
-                        eventMessageRequest.isEncrypted(), eventMessageRequest.getContent(), timestamp));
+        EventMessage eventMessage = new EventMessage(eventMessageRequest);
+        eventMessage.setFrom(sessionInfo.getAgentInfo().getAgentName());
 
-        return JsonResponse.ok();
+        kafkaMessageService.send(sessionInfo.getChannelId(), eventMessage);
+
+        return JsonResponse.success();
     }
 
     @PostMapping(path = "/list-agents")
@@ -87,18 +87,17 @@ public class MessagingController {
         sessionManager.putSession(sessionRequest.getSessionId(), sessionInfo);
 
         List<AgentInfo> activeAgents = sessionManager.getAgentsByChannel(sessionInfo.getChannelId());
-        return JsonResponse.ok(activeAgents);
+        return JsonResponse.success(activeAgents);
     }
 
     @PostMapping(path = "/receive", consumes = MediaType.APPLICATION_JSON_VALUE)
     public JsonResponse receive(@RequestBody(required = false) MessageReceiveRequest messageReceiveRequest) {
-        long timestamp = System.currentTimeMillis();
 
         SessionInfo sessionInfo = checkSessionInfo(messageReceiveRequest.getSessionId());
         EventMessageResult eventMessageResult =
                 kafkaMessageService.receive(sessionInfo.getChannelId(), sessionInfo.getAgentInfo().getAgentName(), messageReceiveRequest.getRange());
 
-        return JsonResponse.ok(eventMessageResult);
+        return JsonResponse.success(eventMessageResult);
     }
 
     @PostMapping(path = "/disconnect", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -106,10 +105,11 @@ public class MessagingController {
         long timestamp = System.currentTimeMillis();
         SessionInfo sessionInfo = checkSessionInfo(sessionRequest.getSessionId());
         AgentInfo agentInfo = sessionInfo.getAgentInfo();
-        kafkaMessageService.send(sessionInfo.getChannelId(), new EventMessage(agentInfo.getAgentName(), "disconnect", false, null, timestamp));
+        kafkaMessageService.send(sessionInfo.getChannelId(), new EventMessage(agentInfo.getAgentName(), ".*",
+                EventMessage.EventType.DISCONNECT, false, null, timestamp));
         sessionManager.removeSession(sessionRequest.getSessionId());
 
-        return JsonResponse.ok();
+        return JsonResponse.success();
     }
 
 

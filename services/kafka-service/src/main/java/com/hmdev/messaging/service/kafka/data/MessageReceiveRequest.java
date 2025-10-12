@@ -9,7 +9,5 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MessageReceiveRequest extends SessionRequest {
-    private String sessionId;
-
     private Range range;
 }

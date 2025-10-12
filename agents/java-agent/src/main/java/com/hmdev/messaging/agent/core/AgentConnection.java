@@ -131,13 +131,13 @@ public class AgentConnection {
      * @return list of message events
      */
     public EventMessageResult receive(long start, long end) {
-        logger.debug("ConnectionChannel.receive: " + start + " -  " + end);
+        logger.debug("ConnectionChannel.receive: {} - {}", start, end);
         if (!readyState || sessionId == null) {
             logger.debug("Channel is not ready for receive mode.");
             return null;
         }
 
-        ApiResponse revResponse = channelApi.receive(sessionId, start + "-" + end);
+        ApiResponse revResponse = channelApi.receive(sessionId, start, end);
 
         if (revResponse.status() == ApiResponse.Status.SUCCESS) {
             try {
@@ -240,8 +240,8 @@ public class AgentConnection {
             return false;
         }
 
-        ApiResponse connectResponse = channelApi.send(msg, asFilterRegex ? destination : Pattern.quote(destination), sessionId);
-        return connectResponse.status() == ApiResponse.Status.SUCCESS;
+        ApiResponse eventResponse = channelApi.send(msg, asFilterRegex ? destination : Pattern.quote(destination), sessionId);
+        return eventResponse.status() == ApiResponse.Status.SUCCESS;
     }
 
     public static class RunnableReceive implements Runnable {
@@ -268,7 +268,7 @@ public class AgentConnection {
 
                 if (messageEventResult != null) {
 
-                    List<EventMessage> events = messageEventResult.getMessageEvents();
+                    List<EventMessage> events = messageEventResult.getEvents();
                     if (!events.isEmpty()) {
                         messageHandler.onMessageEvents(events);
                     }

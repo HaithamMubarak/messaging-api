@@ -16,4 +16,10 @@ public final class CommonUtils {
 		}
 	}
 
+    public static boolean isEmpty(Object object) {
+        if (object instanceof String) {
+            return object.toString().isEmpty();
+        }
+        return object == null;
+    }
 }

@@ -3,6 +3,7 @@ package com.hmdev.messaging.agent.api.http;
 
 import com.hmdev.messaging.common.ApiResponse;
 import com.hmdev.messaging.common.HttpClient;
+import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.security.MySecurity;
 import com.hmdev.messaging.common.security.PemIO;
 import org.slf4j.Logger;
@@ -150,10 +151,10 @@ public class HTTPChannelApi implements ConnectionChannelApi {
     public ApiResponse send(String msg, String destAgent, String session) {
 
         JSONObject msgPayload = new JSONObject();
-        msgPayload.put("type", "chat-text");
+        msgPayload.put("type", EventMessage.EventType.CHAT_TEXT);
         msgPayload.put("to", destAgent);
         msgPayload.put("encrypted", true);
-        msgPayload.put("content", new JSONObject(MySecurity.encryptAndSign(msg, channelSecret)));
+        msgPayload.put("content", MySecurity.encryptAndSign(msg, channelSecret));
         msgPayload.put("sessionId", session);
 
         String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, msgPayload.toString());
