@@ -9,7 +9,6 @@ import com.hmdev.messaging.common.service.EventMessageService;
 import com.hmdev.messaging.service.kafka.utils.KafkaUtils;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,15 +16,16 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Service
 public class KafkaMessageService implements EventMessageService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaMessageService.class);
+    private static final  int CONSUMERS_POOL_SIZE = 10;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final AdminClient adminClient;
@@ -40,12 +40,19 @@ public class KafkaMessageService implements EventMessageService {
     @Value("${messaging.kafka.partitions:1}")
     private int partitions;
 
-    @Value("${messaging.pollingTimeout:30000}")
+    @Value("${messaging.pollingTimeout:35}")
     private long pollingTimeout;
+
+    private KafkaConsumerPool kafkaConsumerPool;
 
     public KafkaMessageService(KafkaTemplate<String, String> kafkaTemplate, AdminClient adminClient) {
         this.kafkaTemplate = kafkaTemplate;
         this.adminClient = adminClient;
+    }
+
+    @PostConstruct
+    public void initialize() throws Exception {
+        this.kafkaConsumerPool = new KafkaConsumerPool(bootstrapServers, CONSUMERS_POOL_SIZE);
     }
 
     @Override
@@ -73,49 +80,35 @@ public class KafkaMessageService implements EventMessageService {
     }
 
     @Override
-    public EventMessageResult receive(String channelId, String target, Range range) {
-
-        List<EventMessage> events = new ArrayList<>();
-        long updateLength = 0;
+    public EventMessageResult receive(String channelId, String recipientName, Range range) {
 
         setupTopic(channelId);
 
-        Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "range-reader-" + UUID.randomUUID());
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-
-        long startOffset = range.getStart();
-        long endOffset = range.getEnd();
-
-        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
-            List<TopicPartition> partitions = consumer.partitionsFor(channelId).stream()
-                    .map(p -> new TopicPartition(channelId, p.partition()))
-                    .collect(Collectors.toList());
-            consumer.assign(partitions);
-
-            for (TopicPartition tp : partitions) {
-                consumer.seek(tp, startOffset);
+        KafkaConsumer<String, String> consumer = null;
+        try {
+            consumer = this.kafkaConsumerPool.acquireConsumer(channelId, range, 3);
+            if (consumer == null)
+            {
+               throw new RuntimeException("Failed to acquire a kafka consumer for channelId: " + channelId);
             }
 
+            List<EventMessage> events = new ArrayList<>();
+            long updateLength = 0;
+
             long startTime = System.currentTimeMillis();
-            while (System.currentTimeMillis() - startTime < pollingTimeout) {
+            while (System.currentTimeMillis() - startTime < (pollingTimeout * 1000)) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
                 for (ConsumerRecord<String, String> rec : records) {
-                    if (rec.offset() >= startOffset && rec.offset() <= endOffset) {
+                    if (rec.offset() >= range.getStart() && rec.offset() <= range.getEnd()) {
                         updateLength++;
                         try {
                             EventMessage event = mapper.readValue(rec.value(), EventMessage.class);
 
-                            // check from matcher
-                            if (matchesTarget(event, target)) {
+                            // check from src/dest matching
+                            if (matchRecipient(event, recipientName)) {
                                 events.add(event);
                             }
-
                         } catch (Exception ex) {
                             LOGGER.error("[Kafka Receive ERROR] Failed to parse event at offset {}: {}", rec.offset(), ex.getMessage());
                         }
@@ -124,12 +117,17 @@ public class KafkaMessageService implements EventMessageService {
 
                 if (!events.isEmpty()) break;
             }
+
+            return new EventMessageResult(events, updateLength);
+
         } catch (Exception e) {
             LOGGER.error("[Kafka Receive ERROR] Failed to read messages for channel {}: {}", channelId, e.getMessage(), e);
             throw new RuntimeException("Kafka receive error: " + e.getMessage(), e);
+        } finally {
+            if (consumer != null) {
+                this.kafkaConsumerPool.releaseConsumer(consumer);
+            }
         }
-
-        return new EventMessageResult(events, updateLength);
     }
 
     @Override
@@ -160,10 +158,14 @@ public class KafkaMessageService implements EventMessageService {
         }
     }
 
-    private boolean matchesTarget(EventMessage eventMessage, String target) {
+    private boolean matchRecipient(EventMessage eventMessage, String recipient) {
+        if (recipient == null) {
+            return true;
+        }
+
         String from = eventMessage.getFrom();
         String to = eventMessage.getTo();
 
-        return !from.equals(target) && (CommonUtils.isEmpty(to) || to.equals(target) || target.matches(to));
+        return !from.equals(recipient) && (CommonUtils.isEmpty(to) || to.equals(recipient) || recipient.matches(to));
     }
 }

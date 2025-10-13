@@ -12,11 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.messaging.MessagingException;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping(path = "/messaging-api/kafka-service", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -40,20 +40,51 @@ public class MessagingController {
 
         String channelId = MySecurity.deriveChannelSecret(connectRequest.getChannelName(),
                 connectRequest.getChannelPassword());
-        String sessionId = java.util.UUID.randomUUID().toString();
 
-        AgentInfo agentInfo = new AgentInfo(connectRequest.getAgentName(), timestamp,
-                connectRequest.getAgentContext());
+        String agentName = connectRequest.getAgentName();
 
-        kafkaMessageService.send(channelId, new EventMessage(connectRequest.getAgentName(), ".*", EventMessage.EventType.CONNECT, false, null, timestamp));
+        boolean agentExists = sessionManager.getAgentsByChannel(channelId).stream()
+                .map(AgentInfo::getAgentName)
+                .anyMatch(agentName::equals);
+
+        boolean sessionExists = false;
+        String sessionId = null;
+
+        if (agentExists) {
+            SessionInfo sessionInfo;
+            // Checks agent re-connect operation if the agent wasn't disconnected properly before
+            // 1 - A valid session ID should be sent
+            // 2 - The same agent name as the previous session should be used
+            if (connectRequest.getSessionId() != null && (sessionInfo = sessionManager.getSession(connectRequest.getSessionId())) != null
+                    && Objects.equals(sessionInfo.getAgentInfo().getAgentName(), agentName)) {
+                sessionId = connectRequest.getSessionId();
+                sessionExists = true;
+            } else {
+                throw new MessagingException("This agent name is currently unavailable as it is already being used by another session.");
+            }
+        }
+
+        // Creates new session id.
+        if(sessionId == null)
+        {
+            sessionId = java.util.UUID.randomUUID().toString();
+        }
+
+        AgentInfo agentInfo = new AgentInfo(agentName, timestamp, connectRequest.getAgentContext());
+
+        if (!sessionExists)
+        {
+            kafkaMessageService.send(channelId, new EventMessage(agentName, ".*", EventMessage.EventType.CONNECT,
+                    false, null, timestamp));
+        }
         sessionManager.putSession(sessionId, new SessionInfo(channelId, agentInfo));
 
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("channelId", channelId);
-        payload.put("sessionId", sessionId);
-        payload.put("date", timestamp);
+        ConnectResponse connectResponse = new ConnectResponse();
+        connectResponse.setSessionId(sessionId);
+        connectResponse.setChannelId(channelId);
+        connectResponse.setDate(timestamp);
 
-        return JsonResponse.success(payload);
+        return JsonResponse.success(connectResponse);
     }
 
     @PostMapping(path = "/event", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -61,7 +92,7 @@ public class MessagingController {
 
         long timestamp = System.currentTimeMillis();
 
-        SessionInfo sessionInfo = checkSessionInfo(eventMessageRequest.getSessionId());
+        SessionInfo sessionInfo = fetchSessionInfo(eventMessageRequest.getSessionId());
         sessionInfo.getAgentInfo().setDate(timestamp);
 
         // Update session timestamp
@@ -80,7 +111,7 @@ public class MessagingController {
 
         long timestamp = System.currentTimeMillis();
 
-        SessionInfo sessionInfo = checkSessionInfo(sessionRequest.getSessionId());
+        SessionInfo sessionInfo = fetchSessionInfo(sessionRequest.getSessionId());
         sessionInfo.getAgentInfo().setDate(timestamp);
 
         // Update session timestamp
@@ -93,7 +124,7 @@ public class MessagingController {
     @PostMapping(path = "/receive", consumes = MediaType.APPLICATION_JSON_VALUE)
     public JsonResponse receive(@RequestBody(required = false) MessageReceiveRequest messageReceiveRequest) {
 
-        SessionInfo sessionInfo = checkSessionInfo(messageReceiveRequest.getSessionId());
+        SessionInfo sessionInfo = fetchSessionInfo(messageReceiveRequest.getSessionId());
         EventMessageResult eventMessageResult =
                 kafkaMessageService.receive(sessionInfo.getChannelId(), sessionInfo.getAgentInfo().getAgentName(), messageReceiveRequest.getRange());
 
@@ -103,7 +134,7 @@ public class MessagingController {
     @PostMapping(path = "/disconnect", consumes = MediaType.APPLICATION_JSON_VALUE)
     public Object disconnect(@RequestBody(required = false) SessionRequest sessionRequest) {
         long timestamp = System.currentTimeMillis();
-        SessionInfo sessionInfo = checkSessionInfo(sessionRequest.getSessionId());
+        SessionInfo sessionInfo = fetchSessionInfo(sessionRequest.getSessionId());
         AgentInfo agentInfo = sessionInfo.getAgentInfo();
         kafkaMessageService.send(sessionInfo.getChannelId(), new EventMessage(agentInfo.getAgentName(), ".*",
                 EventMessage.EventType.DISCONNECT, false, null, timestamp));
@@ -119,10 +150,10 @@ public class MessagingController {
         return JsonResponse.error(exception.getMessage());
     }
 
-    private SessionInfo checkSessionInfo(String sessionId) {
-        SessionInfo sessionInfo = sessionManager.getSession(sessionId);
+    private SessionInfo fetchSessionInfo(String sessionId) {
 
-        if (sessionInfo == null) {
+        SessionInfo sessionInfo;
+        if (sessionId == null || (sessionInfo = sessionManager.getSession(sessionId)) == null) {
             throw new RuntimeException("Agent session not found");
         }
 

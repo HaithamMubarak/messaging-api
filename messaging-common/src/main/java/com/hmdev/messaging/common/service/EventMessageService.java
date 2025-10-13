@@ -24,7 +24,7 @@ public interface EventMessageService {
     /**
      * Receives messages for a channel by source and offset range.
      */
-    EventMessageResult receive(String channelId, String toDest, Range range);
+    EventMessageResult receive(String channelId, String recipientName, Range range);
 
     /**
      * Cleans the channel related resources

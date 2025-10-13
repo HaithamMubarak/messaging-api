@@ -4,5 +4,3 @@ include("services:kafka-service")
 include("agents:java-agent")
 include("agents:web-agent")
 include("agents:python-agent")
-
-gradle.ext.messagingApiUrl = "/messaging-api/origin-service"

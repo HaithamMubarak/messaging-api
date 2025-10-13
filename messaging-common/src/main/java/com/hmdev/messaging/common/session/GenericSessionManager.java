@@ -12,7 +12,7 @@ public interface GenericSessionManager {
 
     /**
      * Stores a new agent session.
-     * Associates both sessionId → AgentInfo and channelId → List<AgentInfo>.
+     * Associates both sessionId -> AgentInfo and channelId -> List<AgentInfo>.
      */
     void putSession(String sessionId, SessionInfo info);
 

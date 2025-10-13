@@ -88,11 +88,11 @@ It is based on a lightweight **Apache + PHP** environment and contains:
   ```
   This directory is created on the host during container startup and mounted into the container.
 - **API endpoints** served via Apache:
-    - `/origin-service?action=connect`
-    - `/origin-service?action=list-agents`
-    - `/origin-service?action=receive`
-    - `/origin-service?action=event`
-    - `/origin-service?action=disconnect`
+    - `/origin-service/connect`
+    - `/origin-service/list-agents`
+    - `/origin-service/receive`
+    - `/origin-service/event`
+    - `/origin-service/disconnect`
 
 The server acts only as a **relay**. It cannot decrypt messages (end-to-end encryption is enforced between agents).
 

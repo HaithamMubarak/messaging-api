@@ -26,6 +26,9 @@ public class HTTPChannelApi implements ConnectionChannelApi {
 
     private final static String PUBLIC_KEY = "public_key.php";
 
+    // polling timeout in seconds
+    private static final int POLLING_TIMEOUT = 40;
+
     // Keep this set to false. A public key may be needed in the future, but HTTPS is sufficient for now.
     private boolean usePublicKey = false;
 
@@ -95,7 +98,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
 
         String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
 
-        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("receive"), cipherPayload);
+        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("receive"), cipherPayload, POLLING_TIMEOUT * 1000);
 
         if (apiResponse.status() == ApiResponse.Status.SUCCESS) {
             JSONObject receivedJson = apiResponse.asJsonResponse().getJsonData().optJSONObject("data");

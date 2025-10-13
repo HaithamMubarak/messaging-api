@@ -8,9 +8,7 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConnectRequest extends SessionRequest {
-    private String channelName;
-    private String channelPassword;
-    private String agentName;
-    private AgentInfo.AgentContext agentContext;
+public class ConnectResponse extends SessionRequest {
+    private String channelId;
+    private long date;
 }

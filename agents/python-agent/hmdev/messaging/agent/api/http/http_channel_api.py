@@ -8,6 +8,9 @@ from hmdev.messaging.agent.util.api_response import ApiResponse, Status
 from hmdev.messaging.agent.util.http_client import HttpClient
 from hmdev.messaging.agent.security.my_security import MySecurity
 
+# 4 SECONDS
+POLLING_TIMEOUT=40
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +48,7 @@ class HTTPChannelApi(ConnectionChannelApi):
     def receive(self, session: str, start: int, end : int) -> ApiResponse:
         params = {"sessionId": session, "range": {"start": start, "end": end}}
         try:
-            txt = self.client.request("POST", self._url("receive"), json_body=params, timeout=30)
+            txt = self.client.request("POST", self._url("receive"), json_body=params, timeout=POLLING_TIMEOUT)
 
             # Expecting JSON list and optional updateLength
             obj = json.loads(txt)

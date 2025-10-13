@@ -31,3 +31,42 @@ dependencies {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+springBoot {
+    mainClass = 'com.hmdev.messaging.service.kafka.Application'
+}
+
+// Define source and target paths
+def webAgentDir = "${rootDir}/agents/web-agent"
+def staticTargetDir = "${projectDir}/src/main/resources/generated/web-agent"
+
+// Task to copy web-agent files except build/dist
+tasks.register('copyWebAgentFiles', Copy) {
+    description = "Copies all files from web-agent into kafka-service static/ except build or dist folders."
+    group = "build"
+
+    from(webAgentDir) {
+        exclude 'build/**'
+        exclude 'dist/**'
+        exclude '.git/**'
+        exclude 'node_modules/**'
+    }
+    into(staticTargetDir)
+
+    // Inject messagingApiUrl into init-agent.js
+    filesMatching("**/init-agent.js") {
+        filter { line ->
+            line.replaceAll(/window\.messagingApiUrl\s*=\s*['"].*?['"];/,
+                    "window.messagingApiUrl = '/messaging-api/kafka-service';")
+        }
+    }
+
+    doFirst {
+        println "Copying web-agent files from ${webAgentDir} to ${staticTargetDir}"
+    }
+}
+
+// Copy files in pre-packaging phase
+tasks.named('processResources') {
+    dependsOn 'copyWebAgentFiles'
+}

@@ -29,7 +29,7 @@ class HttpClient:
             self._last_window_start = time.time()
             self._requests_in_window = 1
 
-    def request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None, timeout: int = 20):
+    def request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None, timeout: int = 30):
         self._throttle()
         url = self.remote_url + path
         headers = {"User-Agent": self.USER_AGENT}

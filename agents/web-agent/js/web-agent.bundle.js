@@ -605,7 +605,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
     var requests = 0;
     var requests_limit = 50;
     var requests_time_period = 1500;
-    var defaultReceiveRange = {start : 0 , end 19};
+    var defaultReceiveRange = {start : 0 , end: 19};
     var xhr_enabled = true;
     var channelKeyRegex = /[\*\/,\\\\\s]+/;
 
@@ -981,6 +981,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         }
 
         xhr.open(method, url);
+        xhr.setRequestHeader("Content-Type", "application/json");
 
         if(binData){
             xhr.setRequestHeader('Content-Type', 'application/octet-stream');
@@ -1282,7 +1283,8 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         if(typeof responseData != 'object'){
             responseData = JSON.parse(responseData);
         }
-        return  responseData.data
+        // todo: fix this in a generic way.
+        return  responseData.data ? responseData.data : responseData;
     }
 
     var Channel = function({usePubKey}){
@@ -1469,23 +1471,29 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
             callback : function(response){
 
-                if(response.status == 'success'){
+                if(response.status === 'success'){
 
-                    var data = extractApiResponseData(response);
+                    var apiResponse = extractApiResponseData(response);
 
-                    if(!data){
+                    if(!apiResponse){
                         _self.dispatchEvent('connect',{response : {status : 'error',data : 'Corrupted data!'}});
+                        _self.readyState = false;
+                        return;
+                    }
+                    if(apiResponse.status === 'error'){
+                        _self.dispatchEvent('connect',{response : {status : 'error', data :  apiResponse.statusMessage} });
+                        _self.readyState = false;
                         return;
                     }
 
-                    if(_self._session_id != data.sessionId){
+                    if(_self._session_id != apiResponse.sessionId){
                         _self._last_receive_range = defaultReceiveRange;
                     }
 
-                    _self._session_id = data.sessionId;
-                    _self._channel_id = data.channelId;
+                    _self._session_id = apiResponse.sessionId;
+                    _self._channel_id = apiResponse.channelId;
 
-                    _self._session_role = data.role;
+                    _self._session_role = apiResponse.role;
                     _self.readyState = true;
 
                     Channel.activeSessions = Channel.activeSessions || {};
@@ -1504,7 +1512,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                         }
 
                         _self._updateAgents();
-                        _self.dispatchEvent('connect',{response : {status : 'success', data: data}});
+                        _self.dispatchEvent('connect', {response : {status : 'success', data: apiResponse}});
 
                         if(autoReceive){
                             _self.autoReceive = autoReceive;
@@ -1512,7 +1520,8 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                         }
                     });
 
-                }else{
+                } else
+                {
                     _self.readyState = false;
                     _self.dispatchEvent('connect',{response : response});
                 }

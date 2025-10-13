@@ -278,8 +278,6 @@ public class AgentConnection {
                     start += dataLength;
                     end += dataLength;
                 }
-
-                CommonUtils.sleep(1000);
             }
         }
 

@@ -5,3 +5,4 @@ logs
 /build/
 agents/java-agent/build
 **/__pycache__/
+services/kafka-service/src/main/resources/generated/web-agent

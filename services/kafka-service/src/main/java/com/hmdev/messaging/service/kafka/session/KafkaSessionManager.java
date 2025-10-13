@@ -29,15 +29,20 @@ public class KafkaSessionManager implements GenericSessionManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSessionManager.class);
 
     private final ConcurrentHashMap<String, SessionInfo> sessionCache = new ConcurrentHashMap<>();
-    Map<String, Map<String, AgentInfo>> channelCache = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, AgentInfo>> channelCache = new ConcurrentHashMap<>();
     private final ObjectMapper mapper = new ObjectMapper();
-    private static final String SESSION_STORE_TOPIC = "session-store";
+
+    private final AdminClient adminClient;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+
+    @Value("${messaging.session.topic}")
+    private String sessionTopic;
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    private final AdminClient adminClient;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    @Value("${messaging.session.useListener:false}")
+    private boolean useSessionCacheListener;
 
     public KafkaSessionManager(AdminClient adminClient, KafkaTemplate<String, String> kafkaTemplate) {
         this.adminClient = adminClient;
@@ -52,13 +57,16 @@ public class KafkaSessionManager implements GenericSessionManager {
     public void initialize() throws Exception {
         LOGGER.info("Initializing KafkaSessionManager...");
 
-        setupSessionTopic(SESSION_STORE_TOPIC);
+        setupSessionTopic(sessionTopic);
 
         // Initialize cache sync at startup.
         preloadSessions();
 
         // Start cache listener
-        new Thread(this::startKafkaCacheListener, "session-cache-listener").start();
+        if (useSessionCacheListener)
+        {
+            new Thread(this::startKafkaCacheListener, "session-cache-listener").start();
+        }
 
         LOGGER.info("KafkaSessionManager initialized successfully.");
     }
@@ -68,7 +76,7 @@ public class KafkaSessionManager implements GenericSessionManager {
         updateInternalCache(sessionId, info);
         try {
             String json = mapper.writeValueAsString(info);
-            kafkaTemplate.send(SESSION_STORE_TOPIC, sessionId, json).addCallback(
+            kafkaTemplate.send(sessionTopic, sessionId, json).addCallback(
                     result -> LOGGER.debug("Session added to Kafka: {}", sessionId),
                     ex -> LOGGER.error("Failed to publish session {}: (kafka error) {}", sessionId, ex.getMessage()));
         } catch (JsonProcessingException e) {
@@ -89,7 +97,7 @@ public class KafkaSessionManager implements GenericSessionManager {
     @Override
     public void removeSession(String sessionId) {
         updateInternalCache(sessionId, null);
-        kafkaTemplate.send(SESSION_STORE_TOPIC, sessionId, null).addCallback(
+        kafkaTemplate.send(sessionTopic, sessionId, null).addCallback(
                 result -> LOGGER.debug("Session remove from Kafka: {}", sessionId),
                 ex -> LOGGER.error("Failed to remove session {}: (kafka error) {}", sessionId, ex.getMessage()));
     }
@@ -107,12 +115,12 @@ public class KafkaSessionManager implements GenericSessionManager {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
-            consumer.subscribe(Collections.singletonList(SESSION_STORE_TOPIC));
+            consumer.subscribe(Collections.singletonList(sessionTopic));
 
             Map<String, SessionInfo> tempSessionCache = new HashMap<>();
             Map<String, Map<String, AgentInfo>> tempChannelCache = new HashMap<>();
 
-            LOGGER.info("Loading existing sessions from Kafka topic '{}'...", SESSION_STORE_TOPIC);
+            LOGGER.info("Loading existing sessions from Kafka topic '{}'...", sessionTopic);
             int emptyPolls = 0;
             int maxEmptyPolls = 5;
             long total = 0;
@@ -180,8 +188,8 @@ public class KafkaSessionManager implements GenericSessionManager {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
-            consumer.subscribe(Collections.singletonList(SESSION_STORE_TOPIC));
-            LOGGER.info("SessionCacheListener subscribed to '{}'", SESSION_STORE_TOPIC);
+            consumer.subscribe(Collections.singletonList(sessionTopic));
+            LOGGER.info("SessionCacheListener subscribed to '{}'", sessionTopic);
 
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(5));
@@ -201,7 +209,6 @@ public class KafkaSessionManager implements GenericSessionManager {
 
     /**
      * Updates local session and channel caches.
-     *
      * Adds or updates the session if {@code sessionInfo} is not null,
      * otherwise removes it from both caches.
      *
