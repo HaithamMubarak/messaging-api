@@ -3,6 +3,8 @@ package com.hmdev.messaging.common;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 public final class CommonUtils {
     private CommonUtils() { /* no instances */ }
 
@@ -19,6 +21,9 @@ public final class CommonUtils {
     public static boolean isEmpty(Object object) {
         if (object instanceof String) {
             return object.toString().isEmpty();
+        }
+        if (object instanceof List) {
+            return ((List<?>)object).isEmpty();
         }
         return object == null;
     }

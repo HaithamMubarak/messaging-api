@@ -1,5 +1,6 @@
 package com.hmdev.messaging.service.kafka.controller;
 
+import com.hmdev.messaging.common.CommonUtils;
 import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
@@ -55,7 +56,8 @@ public class MessagingController {
             // Checks agent re-connect operation if the agent wasn't disconnected properly before
             // 1 - A valid session ID should be sent
             // 2 - The same agent name as the previous session should be used
-            if (connectRequest.getSessionId() != null && (sessionInfo = sessionManager.getSession(connectRequest.getSessionId())) != null
+            if (!CommonUtils.isEmpty(connectRequest.getSessionId())
+                    && (sessionInfo = sessionManager.getSession(connectRequest.getSessionId())) != null
                     && Objects.equals(sessionInfo.getAgentInfo().getAgentName(), agentName)) {
                 sessionId = connectRequest.getSessionId();
                 sessionExists = true;
@@ -143,7 +145,6 @@ public class MessagingController {
         return JsonResponse.success();
     }
 
-
     @ExceptionHandler(Exception.class)
     public JsonResponse handleControllerError(Exception exception) {
         LOGGER.error("Messaging error", exception);
@@ -151,12 +152,10 @@ public class MessagingController {
     }
 
     private SessionInfo fetchSessionInfo(String sessionId) {
-
         SessionInfo sessionInfo;
         if (sessionId == null || (sessionInfo = sessionManager.getSession(sessionId)) == null) {
             throw new RuntimeException("Agent session not found");
         }
-
         return sessionInfo;
     }
 }

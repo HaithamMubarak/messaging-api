@@ -607,7 +607,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
     var requests_time_period = 1500;
     var defaultReceiveRange = {start : 0 , end: 19};
     var xhr_enabled = true;
-    var channelKeyRegex = /[\*\/,\\\\\s]+/;
+    var channelPasswordRegex = /[\*\/,\\\\\s]+/;
 
     "use strict";
 
@@ -1238,7 +1238,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                                 type: 'file-put',
                                 to : _self._agentName,
                                 encrypted : false,//agents encryption is disabled
-                                content : 'binary',//MySecurity.encryptAndSign(res.data,_self._channel_key),
+                                content : 'binary',//MySecurity.encryptAndSign(res.data,_self._channel_password),
                                 sessionId : session
                             };
                             _self._put_xhr = request({
@@ -1406,24 +1406,25 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
         _self._api = config.api || '../';
 
-        if(!_self._last_receive_range || _self._channel_name != config.channelName || _self._channel_key != config.channelKey){
+        if(!_self._last_receive_range || _self._channel_name !== config.channelName || _self._channel_password !== config.channelPassword){
             _self._last_receive_range = defaultReceiveRange;
         }
 
         _self._channel_name = config.channelName;
-        _self._channel_key = config.channelKey;
 
-        if(config.channelKey.search(channelKeyRegex) != -1){
+        if(config.channelPassword.search(channelPasswordRegex) != -1){
             _self.readyState = false;
             return _self.dispatchEvent('connect',{response : {status : 'error',data : "Channel key shouldn't have any character in (*\\/,) and no space"}});
         }
+
+        _self._channel_password = config.channelPassword;
 
         _self._agentName = config.user || config.agentName || config.nickName;
 
         // Gets agent key
         if (!_self._channel_secret)
         {
-            MySecurity.deriveChannelSecret(_self._channel_name, _self._channel_key).then(channelSecret => {
+            MySecurity.deriveChannelSecret(_self._channel_name, _self._channel_password).then(channelSecret => {
                 _self.readyState = false;
                 _self._channel_secret = channelSecret;
                 _self.connect(config);
@@ -1464,29 +1465,33 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             payload: {
                 sessionId : config.sessionId ? config.sessionId : '',
                 channelName: _self._channel_name,
-                channelPassword: MySecurity.hash(_self._channel_key, _self._channel_secret),
+                channelPassword: MySecurity.hash(_self._channel_password, _self._channel_secret),
                 agentName: _self._agentName,
                 agentContext: {agentType: 'WEB-AGENT', descriptor: navigator.userAgent}
             },
 
             callback : function(response){
 
+                const event = {config}
+
                 if(response.status === 'success'){
 
                     var apiResponse = extractApiResponseData(response);
 
                     if(!apiResponse){
-                        _self.dispatchEvent('connect',{response : {status : 'error',data : 'Corrupted data!'}});
+                        event.response = {status : 'error', data : 'Corrupted data!'};
+                        _self.dispatchEvent('connect', event);
                         _self.readyState = false;
                         return;
                     }
                     if(apiResponse.status === 'error'){
-                        _self.dispatchEvent('connect',{response : {status : 'error', data :  apiResponse.statusMessage} });
+                        event.response = {status : 'error', data : apiResponse.statusMessage};
+                        _self.dispatchEvent('connect', event);
                         _self.readyState = false;
                         return;
                     }
 
-                    if(_self._session_id != apiResponse.sessionId){
+                    if(_self._session_id !== apiResponse.sessionId){
                         _self._last_receive_range = defaultReceiveRange;
                     }
 
@@ -1512,7 +1517,8 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                         }
 
                         _self._updateAgents();
-                        _self.dispatchEvent('connect', {response : {status : 'success', data: apiResponse}});
+                        event.response = { status : 'success', data: apiResponse };
+                        _self.dispatchEvent('connect', event);
 
                         if(autoReceive){
                             _self.autoReceive = autoReceive;
@@ -1523,10 +1529,10 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
                 } else
                 {
                     _self.readyState = false;
-                    _self.dispatchEvent('connect',{response : response});
+                    event.response = response;
+                    _self.dispatchEvent('connect', event);
                 }
             }
-
         });
     }
 
@@ -1564,28 +1570,19 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
     }
 
     Channel.prototype.getChannelInfo = function(){
-        if(this._channel_name && this._channel_name != null && this._channel_key && this._channel_key != null){
-
-            var id = this._channel_id;
-
-            return {name : this._channel_name, id : id};
-
-        }else{
+        if(this._channel_name && this._channel_password)
+        {
+            return {name : this._channel_name, id : this._channel_id};
+        }
+        else
+        {
             return null;
         }
-
     }
 
     Channel.prototype.getSessionInfo = function(){
-        if(this._channel_name && this._channel_name != null && this._channel_key && this._channel_key != null){
-            var session = this._session_id || '';
-
-            var tokens = session.split('-');
-
-            //var subtoken = tokens[1];
-            //var index = (subtoken && ('agent'+subtoken)) || 'unknown';
-
-            return {id : tokens[0], index : tokens[1] };
+        if(this._channel_name && this._channel_password){
+            return {id : this._session_id  || '' };
         }else{
             return null;
         }
@@ -1863,7 +1860,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         }
 
         var key = guid32().substring(0,this.encodeKeyLength || 10);
-        var auth = [this._channel_name,this._channel_key];
+        var auth = [this._channel_name,this._channel_password];
 
         var cipher1 = MySecurity.encrypt(auth,md5(key).substring(0,this.encodeKeyLength || 10));
         var cipher2 = MySecurity.encrypt(cipher1,key);
@@ -1899,7 +1896,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
         var tokens = JSON.parse(auth);
 
-        return {channelName : tokens[0],channelKey : tokens[1]};
+        return {channelName : tokens[0],channelPassword : tokens[1]};
 
     }
     Channel.prototype._updateAgents = function(){

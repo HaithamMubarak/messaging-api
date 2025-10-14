@@ -114,7 +114,7 @@
             position: relative;
         }
 
-        #usermsg {
+        #agentmsg {
             border: none;
             position: absolute;
             left: 0;
@@ -188,7 +188,7 @@
             height: 100%;
         }
 
-        .usermsg-mobile {
+        .agentmsg-mobile {
             position: fixed;
             bottom: 16px;
             left: 0;
@@ -450,7 +450,7 @@
 			</span>
 
     <label>Nick Name</label>
-    <input type="text" id="nickName" placeholder="your name" value=""/>
+    <input type="text" id="agentName" placeholder="your name" value=""/>
 </div>
 
 <div id="wrapper">
@@ -482,7 +482,7 @@
     <div class="message-box message-box-dim">
 
         <div class="input-message-container">
-            <textarea name="usermsg" type="text" id="usermsg" placeholder="Type your message" style=""></textarea>
+            <textarea name="agentmsg" type="text" id="agentmsg" placeholder="Type your message" style=""></textarea>
         </div>
 
         <div class="send-button-container">
@@ -494,7 +494,7 @@
 
     <div class="connection-info message-box-dim" style="display:none;">
         <span class="clickable-text" id="channel-text"></span> is connected with <span
-            class="users-count clickable-text"></span>
+            class="agents-count clickable-text"></span>
     </div>
 
 </div>
@@ -530,7 +530,7 @@
 
     function uiDeactiveState() {
 
-        $('#start,#channelName,#channelPassword,#nickName').attr('disabled', false);
+        $('#start,#channelName,#channelPassword,#agentName').attr('disabled', false);
         $('#close,#submitmsg').attr('disabled', true);
 
         $('#channel-input').show();
@@ -540,7 +540,7 @@
     }
 
     function uiActiveState() {
-        $('#start,#channelName,#channelPassword,#nickName').attr('disabled', true);
+        $('#start,#channelName,#channelPassword,#agentName').attr('disabled', true);
         $('#close,#submitmsg').attr('disabled', false);
 
         $('#channel-input').hide();
@@ -564,13 +564,13 @@
             $('.chat-box-botton').attr('style', 'float :left');
             $('.message-box').attr('style', 'height:40px;');
             $('.input-message-container').attr('style', 'right:72px');
-            $('#usermsg').attr('style', 'font-size:15px');
+            $('#agentmsg').attr('style', 'font-size:15px');
         } else {
             $('.send-button-container').attr('style', '');
             $('.chat-box-botton').attr('style', '');
             $('.message-box').attr('style', '');
             $('.input-message-container').attr('style', '');
-            $('#usermsg').attr('style', '');
+            $('#agentmsg').attr('style', '');
         }
     }
 
@@ -584,13 +584,13 @@
             return alert('Please connect to a channel');
         }
 
-        var message = $('#usermsg').val();
+        var message = $('#agentmsg').val();
 
         if (message) {
             sending = true;
             //$('.message-box').attr('style','background-color:#ebebe4;')
             //$('submitmsg').attr('style','background-color:#ebebe4;');
-            //$('#usermsg').attr('disabled','disabled');
+            //$('#agentmsg').attr('disabled','disabled');
 
             channel.sendMessage(message, function (response) {
 
@@ -603,7 +603,7 @@
                 setTimeout(function () {
                     //$('.message-box').removeAttr('style')
                     //$('submitmsg').removeAttr('style');
-                    //$('#usermsg').removeAttr('disabled');
+                    //$('#agentmsg').removeAttr('disabled');
                     sending = false;
                 }, 500);
             });
@@ -630,7 +630,7 @@
 
     function updateAgentsCount() {
         let agents = channel.connectedAgents;
-        $('.users-count').text(agents.length + (agents.length === 1 ? " User" : " Users"));
+        $('.agents-count').text(agents.length + (agents.length === 1 ? " User" : " Users"));
     }
 
     var notifier = {
@@ -812,13 +812,13 @@
 
             email = email.trim();
             var obj = decodeInvitationUrl(email);
-            if (!obj || !obj.channelName || !obj.channelPassword || !obj.nickName) {
+            if (!obj || !obj.channelName || !obj.channelPassword || !obj.agentName) {
                 errorMsg = "(Incorrect) ";
             } else {
 
                 $('#channelName').val(obj.channelName);
                 $('#channelPassword').val(obj.channelPassword);
-                $('#nickName').val(obj.nickName);
+                $('#agentName').val(obj.agentName);
                 localStorage['invitation-email-' + invitation] = email;
 
                 break;
@@ -827,25 +827,20 @@
             email = null;
         }
 
-
         //bind events
-        $('.users-count').click(function () {
-            var users = channel.connectedAgents;
-
-            var usersStr = 'Connected users are :\n';
-            for (var i = 0; i < users.length; i++) {
-                usersStr += users[i] + '\n';
+        $('.agents-count').click(function () {
+            const agents = channel.connectedAgents;
+            let agentsStr = 'Connected agents are :\n';
+            for (let i = 0; i < agents.length; i++) {
+                agentsStr += agents[i] + '\n';
             }
-            alert(usersStr);
-
+            alert(agentsStr);
         });
 
         $('#channel-text').click(function () {
-
-            var channelInfo = channel.getChannelInfo();
-            var sessionInfo = channel.getSessionInfo();
+            const channelInfo = channel.getChannelInfo();
+            const sessionInfo = channel.getSessionInfo();
             prompt('Channel name: ' + channelInfo.name + '\n' + 'Client is connected with session:', sessionInfo.id);
-
         });
 
         var enterCheckBox = $('#press-enter input')[0];
@@ -854,50 +849,55 @@
         });
         pressEnterMode(enterCheckBox.checked);
 
-        $('#usermsg').focus(function () {
+        $('#agentmsg').focus(function () {
             setTimeout(function () {
-                $("#wrapper")[0].scrollTop = $("#wrapper")[0].scrollHeight;
+                const wrapper =  $("#wrapper")[0];
+                wrapper.scrollTop = wrapper.scrollHeight;
             }, 500);
         });
 
         $('#start').click(function () {
 
-            if (!$('#channelName').val()) {
+            const $channelName = $('#channelName');
+            const $channelPassword = $('#channelPassword');
+            const $agentName = $('#agentName');
+
+            if (!$channelName.val()) {
                 return alert('Channel name is required');
             }
-            if (!$('#channelPassword').val()) {
+            if (!$channelPassword.val()) {
                 return alert('Channel password is required');
             }
 
-            if (!$('#nickName').val()) {
-                //return alert('username is required');
-                $('#nickName').val("WEB-AGENT-" + guid());
+            if (!$agentName.val()) {
+                $agentName.val('web-agent-' + guid());
             }
 
             channel.connect({
                 api: messagingApiUrl,
-                channelName: $('#channelName').val(),
-                channelKey: $('#channelPassword').val(),
-                agentName: $('#nickName').val(),
+                channelName: $channelName.val(),
+                channelPassword: $channelPassword.val(),
+                agentName: $agentName.val(),
                 autoReceive: '1000:500:25000',
-                sessionId: localStorage.lastSessionId
+                sessionId: $channelName.val() === localStorage.lastChannelName ? localStorage.lastSessionId : ''
             });
+
         });
 
         $('#close').click(function () {
-            var users = channel.connectedAgents;
-            var lastOne = (users.length == 1);
+            var agents = channel.connectedAgents;
+            var lastOne = (agents.length === 1);
 
-            if (lastOne && messagesCount != 0) {
-                if (!confirm('You are the only user connected to channel, and messages will be cleared once you are disconnected. Are you sure to continue?')) {
+            if (lastOne && messagesCount !== 0) {
+                if (!confirm('You are the only agent connected to channel, and messages will be cleared once you are disconnected. Are you sure to continue?')) {
                     return;
                 }
             }
 
             setTimeout(function () {
-                //another check, you don't know if some user connects before the user clicked on 'yes'
-                users = Object.keys(channel.connectedAgents);
-                lastOne = (users.length == 1);
+                //another check, you don't know if some agent connects before the agent clicked on 'yes'
+                agents = Object.keys(channel.connectedAgents);
+                lastOne = (agents.length == 1);
                 channel.disconnect(function (res) {
                     if (res.status == 'success') {
                         uiDeactiveState();
@@ -923,25 +923,25 @@
 
         $('#clearmsg').click(function () {
 
-            if ($('#usermsg').val() && confirm('Are you sure to delete the chat text?')) {
-                $('#usermsg').val('');
+            if ($('#agentmsg').val() && confirm('Are you sure to delete the chat text?')) {
+                $('#agentmsg').val('');
             }
 
         });
 
         $('#submitmsg').click(send);
 
-        $("#channelName,#channelPassword,#nickName").keypress(function (e) {
+        $("#channelName,#channelPassword,#agentName").keypress(function (e) {
             if (e.which == 13) {
-                //$('#usermsg').val()
+                //$('#agentmsg').val()
                 e.preventDefault();
                 $('#start').click();
             }
         });
 
-        $("#usermsg").keypress(function (e) {
-            if (e.which == 13 && $('#press-enter input')[0].checked && !e.shiftKey) {
-                //$('#usermsg').val()
+        $("#agentmsg").keypress(function (e) {
+            if (e.which === 13 && $('#press-enter input')[0].checked && !e.shiftKey) {
+                //$('#agentmsg').val()
                 e.preventDefault();
                 send();
             }
@@ -968,12 +968,11 @@
             console.log('onconnect:', e);
 
             var response = e.response;
-
-            localStorage.lastSessionId = response.data.sessionId;
-
             sending = false;
-            if (response.status == 'success') {
+            if (response.status === 'success') {
 
+                localStorage.lastSessionId = response.data.sessionId;
+                localStorage.lastChannelName = e.config.channelName;
                 if (!notifier.enabled) {
                     setTimeout(function () {
                         notifier.enabled = true;
@@ -993,8 +992,8 @@
 
             var response = e.response;
 
-            if (response.status == 'success') {
-                if (response.data && response.data != null && response.data.length > 0) {
+            if (response.status === 'success') {
+                if (response.data && response.data.length > 0) {
 
                     console.log('Received data: ');
                     console.log(response.data);
@@ -1002,15 +1001,15 @@
                     for (var i = 0; i < response.data.length; i++) {
                         var item = response.data[i];
                         var date = new Date(item.date);
-                        if (item.type == 'chat-text') {
+                        if (item.type === 'chat-text') {
                             addReceivedMessage({name: item.from, img: "images/other.png"}, item.content, date);
-                        } else if (item.type == 'connect') {
+                        } else if (item.type === 'connect') {
                             notifier.show('New connection!', '<b>' + item.from + '</b> is connected.');
                             updateAgentsCount();
                             addConnectionEvent('User ' + item.from + ' is connected',
                                 '<span class="connection-event-connected"><b>' + item.from + '</b> is connected</span>',
                                 date);
-                        } else if (item.type == 'disconnect') {
+                        } else if (item.type === 'disconnect') {
                             notifier.show('User disconnected!', '<b>' + item.from + '</b> is disconnected.');
                             updateAgentsCount();
                             addConnectionEvent('User ' + item.from + ' is disconnected',
@@ -1021,7 +1020,7 @@
 
                 }
             } else {
-                console.log('Rreceive error: ');
+                console.log('Receive error: ');
                 console.log(response);
             }
         }
@@ -1032,7 +1031,7 @@
         } else if (hash.auth) {
             var authInfo = channel.decodeAuth(hash.auth);
             $('#channelName').val(authInfo.channelName);
-            $('#channelPassword').val(authInfo.channelKey);
+            $('#channelPassword').val(authInfo.channelPassword);
 
             if (hash.connect) {
                 $('#start').click();
@@ -1042,7 +1041,7 @@
 
             loadInputDomVal($('#channelName')[0], 'channelName', '', true, false);
             loadInputDomVal($('#channelPassword')[0], 'channelPassword', '', true, true);
-            loadInputDomVal($('#nickName')[0], 'nickName', '', true, false);
+            loadInputDomVal($('#agentName')[0], 'agentName', '', true, false);
         }
 
     });
@@ -1107,7 +1106,7 @@
             $('#app-container').append(el);
         }
 
-        $('#usermsg').val('');
+        $('#agentmsg').val('');
         last.type = 'sent';
         last.date = date;
         last.user = user;
@@ -1152,17 +1151,18 @@
     }
 
     function decodeInvitationUrl(email, hash) {
-        var authCipher = parseHashParameters(hash).invitation.substring(3);
+        const authCipher = parseHashParameters(hash).invitation;
         console.log('authCipher = ' + authCipher);
-        var invitation_ = MySecurity.decrypt(authCipher, email);
-        if (!invitation_ || invitation_ == null) {
+        const invitation = MySecurity.decrypt(authCipher, email);
+        if (!invitation) {
             return null;
         }
 
+        const invitationTokens = invitation.split('\n');
         return {
-            channelName: invitation_.split('\n')[0],
-            channelPassword: invitation_.split('\n')[1],
-            nickName: invitation_.split('\n')[2]
+            channelName: invitationTokens[0],
+            channelPassword: invitationTokens[1],
+            agentName: invitationTokens[2]
         }
     }
 
