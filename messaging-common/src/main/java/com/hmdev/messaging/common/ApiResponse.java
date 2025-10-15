@@ -30,7 +30,7 @@ public class ApiResponse {
     private final Status status;
     private String data;
     private JSONObject jsonData;
-    private Integer updateLength;
+    private Long nextOffset;
 
     public ApiResponse(Status status, JSONObject jsonData) {
         this.status = status;
@@ -45,10 +45,10 @@ public class ApiResponse {
         this(status, data, null);
     }
 
-    public ApiResponse(Status status, String data, Integer updateLength) {
+    public ApiResponse(Status status, String data, Long nextOffset) {
         this.status = status;
         this.data = data;
-        this.updateLength = updateLength;
+        this.nextOffset = nextOffset;
     }
 
     public Status status() {
@@ -63,8 +63,8 @@ public class ApiResponse {
         return jsonData;
     }
 
-    public Integer getUpdateLength() {
-        return updateLength;
+    public Long getNextOffset() {
+        return nextOffset;
     }
 
     public ApiResponse asJsonResponse() {
@@ -76,7 +76,7 @@ public class ApiResponse {
         obj.put("status", status);
         obj.put("data", data);
         obj.put("jsonData", jsonData);
-        obj.put("updateLength", updateLength);
+        obj.put("nextOffset", nextOffset);
 
         return obj.toString(2);
     }

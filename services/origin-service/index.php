@@ -130,7 +130,7 @@ try{
     case '/receive':
         $controller->connect();
         $data->channelPassword = $controller->getChannelPassword();
-        $receivedData = $controller->receive($data->range);
+        $receivedData = $controller->receive($data->offsetRange);
         json_ok(json_encode($receivedData));
         break;
 
@@ -284,7 +284,7 @@ class ChannelController{
 
 	}
 
-	function receive($range){
+	function receive($offsetRange){
 
 		if(!$this->sessionLocker->lock(true)){
 			throw new Exception('session lock error: current session is already active.');
@@ -304,11 +304,11 @@ class ChannelController{
 
 		$event_max_index = (int)read_file($counter_file);
 
-		if(!strrpos($range,"-")){
-			$range .= '-';
+		if(!strrpos($offsetRange,"-")){
+			$offsetRange .= '-';
 		}
-		$event_range_start = substr($range,0,strrpos($range,"-"));
-		$event_range_end = substr($range,strrpos($range,"-")+1);
+		$event_range_start = substr($offsetRange,0,strrpos($offsetRange,"-"));
+		$event_range_end = substr($offsetRange,strrpos($offsetRange,"-")+1);
 
 		if(!$event_range_end){
 			$event_range_end = PHP_INT_MAX ;
@@ -961,25 +961,25 @@ function stream_file($file_path,$ctype,$is_attachment){
                 list($size_unit, $range_orig) = explode('=', $_SERVER['HTTP_RANGE'], 2);
                 if ($size_unit == 'bytes')
                 {
-                    //multiple ranges could be specified at the same time, but for simplicity only serve the first range
-                    //http://tools.ietf.org/id/draft-ietf-http-range-retrieval-00.txt
-                    list($range, $extra_ranges) = explode(',', $range_orig, 2);
+                    //multiple ranges could be specified at the same time, but for simplicity only serve the first offsetRange
+                    //http://tools.ietf.org/id/draft-ietf-http-offsetRange-retrieval-00.txt
+                    list($offsetRange, $extra_ranges) = explode(',', $range_orig, 2);
                 }
                 else
                 {
-                    $range = '';
+                    $offsetRange = '';
                     header('HTTP/1.1 416 Requested Range Not Satisfiable');
                     exit;
                 }
             }
             else
             {
-                $range = '';
+                $offsetRange = '';
             }
-            //figure out download piece from range (if set)
+            //figure out download piece from offsetRange (if set)
             ob_clean();
-            list($seek_start, $seek_end) = explode('-', $range, 2);
-            //set start and end based on range (if set), else set defaults
+            list($seek_start, $seek_end) = explode('-', $offsetRange, 2);
+            //set start and end based on offsetRange (if set), else set defaults
             //also check for invalid ranges.
             $seek_end   = (empty($seek_end)) ? ($file_size - 1) : min(abs(intval($seek_end)),($file_size - 1));
             $seek_start = (empty($seek_start) || $seek_end < abs(intval($seek_start))) ? 0 : max(abs(intval($seek_start)),0);

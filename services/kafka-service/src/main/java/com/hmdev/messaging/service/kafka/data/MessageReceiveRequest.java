@@ -1,6 +1,6 @@
 package com.hmdev.messaging.service.kafka.data;
 
-import com.hmdev.messaging.common.data.Range;
+import com.hmdev.messaging.common.data.OffsetRange;
 import lombok.*;
 
 @EqualsAndHashCode(callSuper = true)
@@ -9,5 +9,5 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MessageReceiveRequest extends SessionRequest {
-    private Range range;
+    private OffsetRange offsetRange;
 }

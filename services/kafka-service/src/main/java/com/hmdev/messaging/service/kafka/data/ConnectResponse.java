@@ -1,6 +1,5 @@
 package com.hmdev.messaging.service.kafka.data;
 
-import com.hmdev.messaging.common.data.AgentInfo;
 import lombok.*;
 
 @EqualsAndHashCode(callSuper = true)

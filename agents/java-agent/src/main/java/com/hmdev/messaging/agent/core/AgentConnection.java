@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.hmdev.messaging.common.ApiResponse;
-import com.hmdev.messaging.common.CommonUtils;
 import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
@@ -126,31 +125,31 @@ public class AgentConnection {
     /**
      * Pull messages using range window [start, end].
      *
-     * @param start starting index (inclusive) according to API semantics
-     * @param end   ending index (inclusive) per API semantics
+     * @param startOffset the starting offset for first message to receive
+     * @param limit       the limit of messages to be retuned from receive operation
      * @return list of message events
      */
-    public EventMessageResult receive(long start, long end) {
-        logger.debug("ConnectionChannel.receive: {} - {}", start, end);
+    public EventMessageResult receive(long startOffset, long limit) {
+        logger.debug("ConnectionChannel.receive: {} - {}", startOffset, limit);
         if (!readyState || sessionId == null) {
             logger.debug("Channel is not ready for receive mode.");
             return null;
         }
 
-        ApiResponse revResponse = channelApi.receive(sessionId, start, end);
+        ApiResponse revResponse = channelApi.receive(sessionId, startOffset, limit);
 
         if (revResponse.status() == ApiResponse.Status.SUCCESS) {
             try {
                 List<EventMessage> events = mapper.readValue(revResponse.getData(), new TypeReference<>() {
                 });
-                return new EventMessageResult(events, revResponse.getUpdateLength());
+                return new EventMessageResult(events, revResponse.getNextOffset());
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
         } else {
             logger.debug("Receive Error: " + revResponse.getData());
         }
-        return new EventMessageResult(new ArrayList<>(), 0);
+        return new EventMessageResult(new ArrayList<>(), startOffset);
     }
 
     /**
@@ -257,14 +256,12 @@ public class AgentConnection {
         @Override
         public void run() {
 
-            int size = 10;
-
-            long start = 0;
-            long end = start + size;
+            long startOffset = 0;
+            long limit = 20;
 
             while (channel.readyState) {
 
-                EventMessageResult messageEventResult = channel.receive(start, end);
+                EventMessageResult messageEventResult = channel.receive(startOffset, limit);
 
                 if (messageEventResult != null) {
 
@@ -273,10 +270,7 @@ public class AgentConnection {
                         messageHandler.onMessageEvents(events);
                     }
 
-                    long dataLength = messageEventResult.getUpdateLength();
-
-                    start += dataLength;
-                    end += dataLength;
+                    startOffset = messageEventResult.getNextOffset();
                 }
             }
         }

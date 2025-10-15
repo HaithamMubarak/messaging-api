@@ -1,31 +1,35 @@
 package com.hmdev.messaging.service.kafka.service;
 
-import com.hmdev.messaging.common.data.EventMessage;
-import com.hmdev.messaging.common.data.Range;
+import com.hmdev.messaging.common.data.OffsetRange;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-
+@Component
 public class KafkaConsumerPool {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConsumerPool.class);
 
-    private final BlockingQueue<KafkaConsumer<String, String>> pool;
-    private final String bootstrapServers;
-    private final int poolSize;
+    private BlockingQueue<KafkaConsumer<String, String>> pool;
 
-    public KafkaConsumerPool(String bootstrapServers, int poolSize) {
-        this.bootstrapServers = bootstrapServers;
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
+
+    @Value("${spring.kafka.consumers.pool.size}")
+    private int poolSize;
+
+    @PostConstruct
+    public void init() {
         this.pool = new LinkedBlockingQueue<>();
-        this.poolSize = poolSize;
-
         for (int i = 0; i < poolSize; i++) {
             pool.add(createConsumer());
         }
@@ -42,28 +46,29 @@ public class KafkaConsumerPool {
         return new KafkaConsumer<>(props);
     }
 
-    public KafkaConsumer<String, String> acquireConsumer(String channelId, Range range, int timeoutInSeconds) throws InterruptedException {
-        LOGGER.debug("Attempting to acquire consumer for topic '{}' (offset {} to {})...",
-                channelId, range.getStart(), range.getEnd());
+    public KafkaConsumer<String, String> acquireConsumer(String topicName, OffsetRange offsetRange,
+                                                         int timeoutInSeconds) throws InterruptedException {
+        LOGGER.debug("Attempting to acquire consumer for topic '{}' (startOffset {} with limit {})...",
+                topicName, offsetRange.getStartOffset(), offsetRange.getLimit());
 
         KafkaConsumer<String, String> consumer = pool.poll(timeoutInSeconds, TimeUnit.SECONDS);
         if (consumer != null) {
             // Assign to topic partitions
-            List<TopicPartition> partitions = consumer.partitionsFor(channelId).stream()
-                    .map(p -> new TopicPartition(channelId, p.partition()))
+            List<TopicPartition> partitions = consumer.partitionsFor(topicName).stream()
+                    .map(p -> new TopicPartition(topicName, p.partition()))
                     .collect(Collectors.toList());
             consumer.assign(partitions);
 
             // Seek to start offset
             for (TopicPartition tp : partitions) {
-                consumer.seek(tp, range.getStart());
+                consumer.seek(tp, offsetRange.getStartOffset());
             }
 
             LOGGER.debug("Consumer assigned to topic '{}' with {} partitions starting at offset {}.",
-                    channelId, partitions.size(), range.getStart());
+                    topicName, partitions.size(), offsetRange.getStartOffset());
         } else {
             LOGGER.warn("No available consumers in pool (waited {}s). Request for '{}' rejected.",
-                    timeoutInSeconds, channelId);
+                    timeoutInSeconds, topicName);
         }
         return consumer;
     }

@@ -11,6 +11,6 @@ import java.util.List;
 public class EventMessageResult {
 
     private List<EventMessage> events;
-    private long updateLength;
+    private Long nextOffset;
 
 }

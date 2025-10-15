@@ -125,7 +125,8 @@ public class HTTPChannelApi implements ConnectionChannelApi {
                 dataArray.put(item);
             }
 
-            return new ApiResponse(ApiResponse.Status.SUCCESS, dataArray.toString(), receivedJson.optIntegerObject("updateLength"));
+            return new ApiResponse(ApiResponse.Status.SUCCESS, dataArray.toString(),
+                    receivedJson.optLongObject("nextOffset"));
 
         } else {
             return apiResponse;

@@ -59,10 +59,10 @@ class AgentConnection:
         self._session_id = None
         self._ready_state = False
 
-    def receive(self, start: int, end: int) -> Optional[ApiResponse]:
+    def receive(self, startOffset: int, end: limit) -> Optional[ApiResponse]:
         if not (self._ready_state and self._session_id and self._channel_password):
             return None
-        resp = self._channel_api.receive( self._session_id, start, end)
+        resp = self._channel_api.receive( self._session_id, startOffset, limit)
         return resp
 
     def receive_async(self, handler: AgentConnectionEventHandler) -> None:
@@ -71,10 +71,11 @@ class AgentConnection:
             self._receive_thread.start()
 
     def _run_receive(self, handler: AgentConnectionEventHandler) -> None:
-        size = 10
-        start, end = 0, size
+        startOffset = 0
+        limit = 20
+
         while self._ready_state:
-            resp = self.receive(start, end)
+            resp = self.receive(startOffset, limit)
             if resp and resp.status == Status.SUCCESS:
                 try:
                     events: List[Dict[str, Any]] = json.loads(resp.data)
@@ -82,9 +83,8 @@ class AgentConnection:
                     events = []
                 if events:
                     handler.on_message_events(events)
-                delta = resp.update_length or len(events)
-                start += delta
-                end += delta
+                startOffset = resp.nextOffset
+
             sleep(1)
 
     def send_message(self, msg: str, destination: Optional[str] = ".*", as_filter_regex: Optional[bool] = True) -> bool:

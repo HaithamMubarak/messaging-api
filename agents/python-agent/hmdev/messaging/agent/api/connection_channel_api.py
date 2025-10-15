@@ -8,7 +8,7 @@ class ConnectionChannelApi(ABC):
         ...
 
     @abstractmethod
-    def receive(self, session: str, start: int, end: int) -> ApiResponse:
+    def receive(self, session: str, startOffset: int, limit: int) -> ApiResponse:
         ...
 
     @abstractmethod

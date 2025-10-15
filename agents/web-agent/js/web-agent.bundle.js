@@ -605,7 +605,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
     var requests = 0;
     var requests_limit = 50;
     var requests_time_period = 1500;
-    var defaultReceiveRange = {start : 0 , end: 19};
+    var defaultReceiveRange = {startOffset : 0 , limit: 20};
     var xhr_enabled = true;
     var channelPasswordRegex = /[\*\/,\\\\\s]+/;
 
@@ -738,7 +738,6 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
             end = rangeNumber(range.split(seperator)[1]);
         }
 
-
         if(start > end){
             var temp = start;
             start = end;
@@ -746,15 +745,6 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
         }
 
         return {start, change, end};
-    }
-
-    function updateRange(range, rangeUpdate){
-        let rangeObj = parseRange(range);
-
-        rangeObj.start += rangeUpdate;
-        rangeObj.end += rangeUpdate;
-
-        return rangeObj;
     }
 
     function guid8() {
@@ -1621,8 +1611,6 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
                 delete _self._receive_xhr;
 
-                var rangeUpdate = 0;
-
                 if(response.status == 'error'){
                     _self.dispatchEvent('message', {response : response});
                 }else{
@@ -1658,7 +1646,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
                         }
 
-                        rangeUpdate += data.updateLength;
+                        range.startOffset += data.nextOffset;
                         response.data = dataArray;
                         //Connected agent messages are returned only in case there is no new event
                         //these data sent in case of request timeout
@@ -1682,22 +1670,23 @@ if (typeof module != 'undefined' && module.exports) module.exports = AesCtr; // 
 
                         //check connection event messages to update
                         //connected agents.
-                        for(var i=0;i<response.data.length;i++){
+                        for(var i=0; i<response.data.length; i++){
                             var item = response.data[i];
                             if (item.type == 'connect'){
                                 _self._connectedAgentsMap[item.from] = true;
                                 _self._updateAgents();
-
-                            }else if (item.type == 'disconnect'){
+                            }
+                            else if (item.type == 'disconnect')
+                            {
                                 delete _self._connectedAgentsMap[item.from];
                                 _self._updateAgents();
                             }
                         }
 
-                        _self.dispatchEvent('message',{response : response});
+                        _self.dispatchEvent('message', {response : response});
                     }
 
-                    _self._last_receive_range = updateRange(range, rangeUpdate);
+                    _self._last_receive_range = range;
 
                 }
 

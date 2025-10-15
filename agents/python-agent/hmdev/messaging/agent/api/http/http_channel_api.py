@@ -45,8 +45,8 @@ class HTTPChannelApi(ConnectionChannelApi):
         except Exception as e:
             return ApiResponse(Status.ERROR, str(e))
 
-    def receive(self, session: str, start: int, end : int) -> ApiResponse:
-        params = {"sessionId": session, "range": {"start": start, "end": end}}
+    def receive(self, session: str, startOffset: int, limit : int) -> ApiResponse:
+        params = {"sessionId": session, "offsetRange": {"startOffset": start, "limit": limit}}
         try:
             txt = self.client.request("POST", self._url("receive"), json_body=params, timeout=POLLING_TIMEOUT)
 

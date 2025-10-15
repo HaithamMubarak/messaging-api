@@ -76,7 +76,7 @@ curl 'https://hmdevonline.com/messaging-api/origin-service/list-agents'   --data
 
 **Request:**
 ```bash
-curl 'https://hmdevonline.com/messaging-api/origin-service/receive'   --data-raw '{"session":"da44fb94d3d04833a8c5755c791dfb84","range":"3-22"}'
+curl 'https://hmdevonline.com/messaging-api/origin-service/receive'   --data-raw '{"session":"da44fb94d3d04833a8c5755c791dfb84","offsetRange":"3-22"}'
 ```
 
 **Response:**

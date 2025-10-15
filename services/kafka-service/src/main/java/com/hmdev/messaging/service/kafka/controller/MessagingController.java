@@ -128,7 +128,7 @@ public class MessagingController {
 
         SessionInfo sessionInfo = fetchSessionInfo(messageReceiveRequest.getSessionId());
         EventMessageResult eventMessageResult =
-                kafkaMessageService.receive(sessionInfo.getChannelId(), sessionInfo.getAgentInfo().getAgentName(), messageReceiveRequest.getRange());
+                kafkaMessageService.receive(sessionInfo.getChannelId(), sessionInfo.getAgentInfo().getAgentName(), messageReceiveRequest.getOffsetRange());
 
         return JsonResponse.success(eventMessageResult);
     }

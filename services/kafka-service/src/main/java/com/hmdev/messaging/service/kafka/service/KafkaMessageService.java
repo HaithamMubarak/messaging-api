@@ -4,10 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdev.messaging.common.CommonUtils;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
-import com.hmdev.messaging.common.data.Range;
+import com.hmdev.messaging.common.data.Pair;
+import com.hmdev.messaging.common.data.OffsetRange;
 import com.hmdev.messaging.common.service.EventMessageService;
-import com.hmdev.messaging.service.kafka.utils.KafkaUtils;
-import org.apache.kafka.clients.admin.*;
+import com.hmdev.messaging.service.kafka.service.provider.ChannelType;
+import com.hmdev.messaging.service.kafka.service.provider.IChannelTopicProvider;
 import org.apache.kafka.clients.consumer.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,61 +17,50 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+
 
 @Service
 public class KafkaMessageService implements EventMessageService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaMessageService.class);
-    private static final  int CONSUMERS_POOL_SIZE = 10;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final AdminClient adminClient;
     private final ObjectMapper mapper = new ObjectMapper();
-
-    @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers;
-
-    @Value("${messaging.kafka.replication-factor:1}")
-    private short replicationFactor;
-
-    @Value("${messaging.kafka.partitions:1}")
-    private int partitions;
+    private final KafkaConsumerPool kafkaConsumerPool;
+    private final IChannelTopicProvider channelTopicProvider;
 
     @Value("${messaging.pollingTimeout:35}")
     private long pollingTimeout;
 
-    private KafkaConsumerPool kafkaConsumerPool;
-
-    public KafkaMessageService(KafkaTemplate<String, String> kafkaTemplate, AdminClient adminClient) {
+    public KafkaMessageService(KafkaTemplate<String, String> kafkaTemplate, IChannelTopicProvider channelTopicProvider,
+                               KafkaConsumerPool kafkaConsumerPool) {
         this.kafkaTemplate = kafkaTemplate;
-        this.adminClient = adminClient;
-    }
-
-    @PostConstruct
-    public void initialize() throws Exception {
-        this.kafkaConsumerPool = new KafkaConsumerPool(bootstrapServers, CONSUMERS_POOL_SIZE);
+        this.channelTopicProvider = channelTopicProvider;
+        this.kafkaConsumerPool = kafkaConsumerPool;
     }
 
     @Override
     public void send(String channelId, EventMessage event) {
         try {
-            setupTopic(channelId);
+            Pair<String, String> topicResult = channelTopicProvider.resolveTopic(channelId, ChannelType.DEFAULT);
+            String topic = topicResult.getFirst();
+            String key = topicResult.getSecond();
 
             String payload = mapper.writeValueAsString(event);
 
-            SendResult<String, String> result = kafkaTemplate.send(channelId, channelId, payload).get(10, TimeUnit.SECONDS);
+            SendResult<String, String> result = kafkaTemplate.send(topic, key, payload).get(10, TimeUnit.SECONDS);
 
             if (result != null && result.getRecordMetadata() != null) {
                 LOGGER.debug(
-                        "[Kafka Send] Channel={} | Partition={} | Offset={} | Key={}",
+                        "[Kafka Send] Channel={} | Topic={} | Partition={} | Offset={} | Key={}",
                         channelId,
+                        topic,
                         result.getRecordMetadata().partition(),
                         result.getRecordMetadata().offset(),
-                        channelId
+                        key
                 );
             }
         } catch (Exception e) {
@@ -80,81 +70,59 @@ public class KafkaMessageService implements EventMessageService {
     }
 
     @Override
-    public EventMessageResult receive(String channelId, String recipientName, Range range) {
+    public EventMessageResult receive(String channelId, String recipientName, OffsetRange offsetRange) {
 
-        setupTopic(channelId);
+        Pair<String, String> topicResult = channelTopicProvider.resolveTopic(channelId, ChannelType.DEFAULT);
+        String topic = topicResult.getFirst();
+        String key = topicResult.getSecond();
 
         KafkaConsumer<String, String> consumer = null;
         try {
-            consumer = this.kafkaConsumerPool.acquireConsumer(channelId, range, 3);
+            consumer = this.kafkaConsumerPool.acquireConsumer(topic, offsetRange, 3);
             if (consumer == null)
             {
                throw new RuntimeException("Failed to acquire a kafka consumer for channelId: " + channelId);
             }
 
             List<EventMessage> events = new ArrayList<>();
-            long updateLength = 0;
+            long nextOffset = offsetRange.getStartOffset();
 
             long startTime = System.currentTimeMillis();
             while (System.currentTimeMillis() - startTime < (pollingTimeout * 1000)) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
                 for (ConsumerRecord<String, String> rec : records) {
-                    if (rec.offset() >= range.getStart() && rec.offset() <= range.getEnd()) {
-                        updateLength++;
+                    // Checks if the current record belongs to the input channel id and aligned with
+                    // Range input
+                    if (Objects.equals(rec.key(), key) &&
+                            rec.offset() >= offsetRange.getStartOffset() && events.size() < offsetRange.getLimit()) {
                         try {
                             EventMessage event = mapper.readValue(rec.value(), EventMessage.class);
 
-                            // check from src/dest matching
+                            // check from Src/Dest matching
                             if (matchRecipient(event, recipientName)) {
                                 events.add(event);
                             }
+
+                            nextOffset = rec.offset() + 1;
                         } catch (Exception ex) {
-                            LOGGER.error("[Kafka Receive ERROR] Failed to parse event at offset {}: {}", rec.offset(), ex.getMessage());
+                            LOGGER.error("[Kafka Receive ERROR] Failed to parse event at offset {}: {}",
+                                    rec.offset(), ex.getMessage());
                         }
                     }
                 }
-
                 if (!events.isEmpty()) break;
             }
 
-            return new EventMessageResult(events, updateLength);
-
-        } catch (Exception e) {
-            LOGGER.error("[Kafka Receive ERROR] Failed to read messages for channel {}: {}", channelId, e.getMessage(), e);
-            throw new RuntimeException("Kafka receive error: " + e.getMessage(), e);
+            return new EventMessageResult(events, nextOffset);
+        } catch (Exception exception) {
+            LOGGER.error("[Kafka Receive ERROR] Failed to read messages for channel {}: {}", channelId,
+                    exception.getMessage(), exception);
+            throw new RuntimeException("Kafka receive error: " + exception.getMessage(), exception);
         } finally {
             if (consumer != null) {
                 this.kafkaConsumerPool.releaseConsumer(consumer);
             }
-        }
-    }
-
-    @Override
-    public boolean clean(String channelId) {
-        try {
-            adminClient.deleteTopics(Collections.singletonList(channelId))
-                    .all().get(5, TimeUnit.SECONDS);
-            LOGGER.debug("[Kafka] Deleted topic '{}'", channelId);
-            return true;
-        } catch (Exception e) {
-            LOGGER.error("[Kafka] Failed to delete topic '{}': {}", channelId, e.getMessage(), e);
-            return false;
-        }
-    }
-
-    private void setupTopic(String topicName) {
-        try {
-            if (!KafkaUtils.topicExists(adminClient, topicName)) {
-                NewTopic topic = new NewTopic(topicName, partitions, replicationFactor);
-                adminClient.createTopics(Collections.singletonList(topic))
-                        .all().get(5, TimeUnit.SECONDS);
-                LOGGER.debug("[Kafka] Created topic '{}' (partitions={}, replication={})",
-                        topicName, partitions, replicationFactor);
-            }
-        } catch (Exception e) {
-            LOGGER.error("[Kafka] Error ensuring topic exists '{}': {}", topicName, e.getMessage(), e);
-            throw new RuntimeException(e.getMessage(), e);
         }
     }
 

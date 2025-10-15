@@ -11,9 +11,9 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Properties;
 
 @Configuration
-public class KafkaAdminConfig {
+public class MessagingConfig {
 
-    private final Logger LOGGER = LoggerFactory.getLogger(KafkaAdminConfig.class);
+    private final Logger LOGGER = LoggerFactory.getLogger(MessagingConfig.class);
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
