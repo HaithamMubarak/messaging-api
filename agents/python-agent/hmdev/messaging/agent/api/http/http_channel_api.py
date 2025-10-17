@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 
 import requests
 from hmdev.messaging.agent.api.connection_channel_api import ConnectionChannelApi
-from hmdev.messaging.agent.api.models import ConnectResponse, EventMessageResult, AgentInfo
+from hmdev.messaging.agent.api.models import ConnectResponse, EventMessageResult, AgentInfo, ChannelMetadata
 from hmdev.messaging.agent.util.http_client import HttpClient
 from hmdev.messaging.agent.security.my_security import MySecurity
 
@@ -22,9 +22,25 @@ class HTTPChannelApi(ConnectionChannelApi):
         self.use_public_key = use_public_key
         self.client = HttpClient(remote_url)
         self.channel_secret = None
+        # track readiness and current session like the Java implementation
+        self.ready_state: bool = False
+        self.session_id: Optional[str] = None
+        # store channel metadata returned by the server (topicName, channelId)
+        self.channel_metadata: Optional[ChannelMetadata] = None
 
     def _url(self, action: str) -> str:
         return f"/{action}?use-pubkey={str(self.use_public_key).lower()}"
+
+    def is_channel_ready(self) -> bool:
+        """Return True when channel is ready (mirrors Java isChannelReady).
+
+        Success when both `ready_state` is truthy and `session_id` is not None.
+        Logs a debug message and returns False when not ready.
+        """
+        if not getattr(self, 'ready_state', False) or getattr(self, 'session_id', None) is None:
+            logger.debug("Unable use channel operation, channel is not ready")
+            return False
+        return True
 
     def connect(self, channel_name: str, channel_key: str, agent_name: str, session_id: Optional[str] = None) -> ConnectResponse:
         try:
@@ -40,34 +56,53 @@ class HTTPChannelApi(ConnectionChannelApi):
                 payload["sessionId"] = session_id
 
             response_text = self.client.request("POST", self._url("connect"), json_body=payload)
-
-            # Try to parse JSON response defensively
-            try:
-                json_data = json.loads(response_text)
-            except Exception:
-                json_data = None
+            json_data = json.loads(response_text)
 
             # server uses {status: 'success', data: {...}}
             if isinstance(json_data, dict) and str(json_data.get('status')) == 'success':
                 data = json_data.get('data', {})
                 session = None
                 date = None
+                metadata = None
+                channel_id = None
                 if isinstance(data, dict):
                     session = data.get('sessionId') or data.get('session')
                     date = data.get('date')
-                return ConnectResponse(sessionId=session, date=date, raw=data)
+                    # parse channel metadata if provided
+                    md = data.get('metadata') or data.get('channelMetadata')
+                    if isinstance(md, dict):
+                        metadata = ChannelMetadata(topicName=md.get('topicName'), channelId=md.get('channelId'))
+                        channel_id = metadata.channelId or data.get('channelId')
+
+                # mark as ready and store session + metadata on the instance
+                self.ready_state = True
+                self.session_id = session
+                if isinstance(metadata, ChannelMetadata):
+                    self.channel_metadata = metadata
+                return ConnectResponse(sessionId=session, channelId=channel_id, date=date, metadata=metadata)
 
             # fallback: if server returned plain JSON object with sessionId
             if isinstance(json_data, dict):
                 session = json_data.get('sessionId') or json_data.get('session')
-                return ConnectResponse(sessionId=session, raw=json_data)
+                # try to extract metadata if present
+                md = json_data.get('metadata') or json_data.get('channelMetadata')
+                metadata = None
+                if isinstance(md, dict):
+                    metadata = ChannelMetadata(topicName=md.get('topicName'), channelId=md.get('channelId'))
+                    self.channel_metadata = metadata
+                self.ready_state = True
+                self.session_id = session
+                return ConnectResponse(sessionId=session, channelId=(metadata.channelId if metadata else None), metadata=metadata)
 
             # plain string session id
             if isinstance(response_text, str) and response_text.strip():
-                return ConnectResponse(sessionId=response_text.strip(), raw=response_text)
+                session = response_text.strip()
+                self.ready_state = True
+                self.session_id = session
+                return ConnectResponse(sessionId=session)
 
-        except Exception as e:
-            logger.error("Unable to connect to the channel: %s", e)
+        except Exception as ex:
+            logger.error("Unable to connect to the channel: %s", ex)
 
         return ConnectResponse()
 
@@ -120,7 +155,7 @@ class HTTPChannelApi(ConnectionChannelApi):
             agents: List[AgentInfo] = []
             for item in data:
                 if isinstance(item, dict):
-                    agents.append(AgentInfo(agentName=item.get('agentName', ''), lastSeen=item.get('date'), meta=item))
+                    agents.append(AgentInfo(agentName=item.get('agentName', ''), date=item.get('date'), meta=item))
             return agents
 
         except Exception as e:
@@ -149,12 +184,15 @@ class HTTPChannelApi(ConnectionChannelApi):
             txt = self.client.request("POST", self._url("disconnect"), json_body=payload)
             self.client.close_all()
             obj = json.loads(txt)
+            # clear ready state
+            self.ready_state = False
+            self.session_id = None
             return isinstance(obj, dict) and str(obj.get('status')) == 'success'
         except Exception as e:
             logger.warning(e)
             return False
 
-    def create_agent_context(self):
+    def create_agent_context(self) -> Dict[str, str]:
         return {
             "agentType": "PYTHON-AGENT",
             "descriptor": "hmdev/messaging/agent/api/http/http_channel_api.py"

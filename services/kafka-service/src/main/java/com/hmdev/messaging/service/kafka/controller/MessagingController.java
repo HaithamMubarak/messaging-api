@@ -71,18 +71,24 @@ public class MessagingController {
         }
 
         AgentInfo agentInfo = new AgentInfo(agentName, timestamp, connectRequest.getAgentContext());
-
+        ChannelMetadata channelMetadata;
         if (!sessionExists)
         {
-            kafkaMessageService.send(channelId, new EventMessage(agentName, "*", EventMessage.EventType.CONNECT,
+            channelMetadata = kafkaMessageService.send(channelId, new EventMessage(agentName, "*", EventMessage.EventType.CONNECT,
                     false, null, timestamp));
         }
+        else
+        {
+            channelMetadata = kafkaMessageService.getChannelMetdata(channelId, ChannelType.DEFAULT);
+        }
+
         sessionManager.putSession(sessionId, new SessionInfo(channelId, agentInfo));
 
         ConnectResponse connectResponse = new ConnectResponse();
         connectResponse.setSessionId(sessionId);
         connectResponse.setChannelId(channelId);
         connectResponse.setDate(timestamp);
+        connectResponse.setMetadata(channelMetadata);
 
         return JsonResponse.success(connectResponse);
     }

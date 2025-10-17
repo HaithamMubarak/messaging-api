@@ -1,13 +1,14 @@
 package com.hmdev.messaging.service.kafka.service.provider;
 
 
-import com.hmdev.messaging.common.data.Pair;
+import com.hmdev.messaging.common.data.ChannelType;
+import com.hmdev.messaging.common.data.ChannelMetadata;
 
 public interface IChannelTopicProvider {
 
-    Pair<String, String> resolveTopic(String channelId, ChannelType channelType);
+    ChannelMetadata resolveTopic(String channelId, ChannelType channelType);
 
-    default Pair<String, String> resolveTopic(String channelId) {
+    default ChannelMetadata resolveTopic(String channelId) {
         return resolveTopic(channelId, ChannelType.DEFAULT);
     }
 }

@@ -1,23 +1,24 @@
 package com.hmdev.messaging.common.service;
 
 
-import com.hmdev.messaging.common.data.EventMessage;
-import com.hmdev.messaging.common.data.EventMessageResult;
-import com.hmdev.messaging.common.data.OffsetRange;
-
+import com.hmdev.messaging.common.data.*;
 
 public interface EventMessageService {
 
     /**
-     * Sends a message to the channel.
+     * Gets metadata about the channel (topic name, etc.).
      */
-    void send(String channelId, EventMessage event);
+    ChannelMetadata getChannelMetdata(String channelId, ChannelType channelType);
+
+    /**
+     * Sends a message to the channel and returns metadata about the send (channel id , topic, etc.).
+     */
+    ChannelMetadata send(String channelId, EventMessage event);
 
     /**
      * Receives messages for a channel by offset range.
      */
-    default EventMessageResult receive(String channelId, OffsetRange offsetRange)
-    {
+    default EventMessageResult receive(String channelId, OffsetRange offsetRange) {
         return receive(channelId, null, offsetRange);
     }
 

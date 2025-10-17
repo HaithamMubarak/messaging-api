@@ -2,7 +2,8 @@ package com.hmdev.messaging.service.kafka.service.provider;
 
 
 
-import com.hmdev.messaging.common.data.Pair;
+import com.hmdev.messaging.common.data.ChannelType;
+import com.hmdev.messaging.common.data.ChannelMetadata;
 import com.hmdev.messaging.service.kafka.utils.KafkaUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -35,7 +36,7 @@ public class ChannelTopicProviderImpl implements IChannelTopicProvider {
     }
 
     @Override
-    public Pair<String, String> resolveTopic(String channelId, ChannelType channelType) {
+    public ChannelMetadata resolveTopic(String channelId, ChannelType channelType) {
         String topicName = this.channelIdToKafkaTopic(channelId, channelType);
         try {
             if (!KafkaUtils.topicExists(adminClient, topicName)) {
@@ -49,7 +50,7 @@ public class ChannelTopicProviderImpl implements IChannelTopicProvider {
             LOGGER.error("[Kafka] Error ensuring topic exists '{}': {}", topicName, e.getMessage(), e);
             throw new RuntimeException(e.getMessage(), e);
         }
-        return new Pair<>(topicName, channelId);
+        return new ChannelMetadata(topicName, channelId);
     }
 
     private String channelIdToKafkaTopic(String channelId, ChannelType channelType) {

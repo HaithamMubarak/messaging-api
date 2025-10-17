@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdev.messaging.common.CommonUtils;
 import com.hmdev.messaging.common.data.EventMessage;
 import com.hmdev.messaging.common.data.EventMessageResult;
-import com.hmdev.messaging.common.data.Pair;
 import com.hmdev.messaging.common.data.OffsetRange;
+import com.hmdev.messaging.common.data.ChannelMetadata;
 import com.hmdev.messaging.common.service.EventMessageService;
-import com.hmdev.messaging.service.kafka.service.provider.ChannelType;
+import com.hmdev.messaging.common.data.ChannelType;
 import com.hmdev.messaging.service.kafka.service.provider.IChannelTopicProvider;
 import org.apache.kafka.clients.consumer.*;
 import org.slf4j.Logger;
@@ -44,15 +44,21 @@ public class KafkaMessageService implements EventMessageService {
     }
 
     @Override
-    public void send(String channelId, EventMessage event) {
+    public ChannelMetadata getChannelMetdata(String channelId, ChannelType channelType) {
+        // Delegate to provider which now returns ChannelMetadata directly
+        return channelTopicProvider.resolveTopic(channelId, channelType);
+    }
+
+    @Override
+    public ChannelMetadata send(String channelId, EventMessage event) {
         try {
-            Pair<String, String> topicResult = channelTopicProvider.resolveTopic(channelId, ChannelType.DEFAULT);
-            String topic = topicResult.getFirst();
-            String key = topicResult.getSecond();
+            ChannelMetadata topicResult = channelTopicProvider.resolveTopic(channelId, ChannelType.DEFAULT);
+            String topic = topicResult.getTopicName();
+            String key = topicResult.getChannelId();
 
             String payload = mapper.writeValueAsString(event);
 
-            SendResult<String, String> result = kafkaTemplate.send(topic, key, payload).get(10, TimeUnit.SECONDS);
+            SendResult<String, String> result = kafkaTemplate.send(topic, key, payload).get(5, TimeUnit.SECONDS);
 
             if (result != null && result.getRecordMetadata() != null) {
                 LOGGER.debug(
@@ -64,6 +70,9 @@ public class KafkaMessageService implements EventMessageService {
                         key
                 );
             }
+
+            // return metadata (topic name and channelId) to caller
+            return topicResult;
         } catch (Exception e) {
             LOGGER.error("[Kafka Send ERROR] Failed to send message to channel {}: {}", channelId, e.getMessage(), e);
             throw new RuntimeException("Failed to send Kafka message: " + e.getMessage(), e);
@@ -73,9 +82,9 @@ public class KafkaMessageService implements EventMessageService {
     @Override
     public EventMessageResult receive(String channelId, String recipientName, OffsetRange offsetRange) {
 
-        Pair<String, String> topicResult = channelTopicProvider.resolveTopic(channelId, ChannelType.DEFAULT);
-        String topic = topicResult.getFirst();
-        String key = topicResult.getSecond();
+        ChannelMetadata topicResult = channelTopicProvider.resolveTopic(channelId, ChannelType.DEFAULT);
+        String topic = topicResult.getTopicName();
+        String key = topicResult.getChannelId();
 
         KafkaConsumer<String, String> consumer = null;
         try {
