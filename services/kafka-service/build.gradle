@@ -1,9 +1,14 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 group = 'com.hmdev.messaging.service'
 version = '0.1.0'
+
+application {
+    mainClass = 'com.hmdev.messaging.service.kafka.KafkaServiceApplication'
+}
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
