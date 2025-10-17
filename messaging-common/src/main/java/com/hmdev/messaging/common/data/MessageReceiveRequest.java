@@ -1,6 +1,5 @@
-package com.hmdev.messaging.service.kafka.data;
+package com.hmdev.messaging.common.data;
 
-import com.hmdev.messaging.common.data.OffsetRange;
 import lombok.*;
 
 @EqualsAndHashCode(callSuper = true)

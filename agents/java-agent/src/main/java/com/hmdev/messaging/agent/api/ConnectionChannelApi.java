@@ -1,19 +1,24 @@
 package com.hmdev.messaging.agent.api;
 
-import com.hmdev.messaging.common.ApiResponse;
+import com.hmdev.messaging.common.HttpClientResult;
+import com.hmdev.messaging.common.data.AgentInfo;
+import com.hmdev.messaging.common.data.ConnectResponse;
+import com.hmdev.messaging.common.data.EventMessageResult;
+
+import java.util.List;
 
 public interface ConnectionChannelApi {
 
-    ApiResponse connect(String channelName, String channelKey, String agentName) throws Exception;
+    ConnectResponse connect(String channelName, String channelKey, String agentName);
 
-    ApiResponse connect(String channelName, String channelKey, String agentName, String sessionId) throws Exception;
+    ConnectResponse connect(String channelName, String channelKey, String agentName, String sessionId);
 
-    ApiResponse receive(String session, long start, long end);
+    EventMessageResult receive(String session, long startOffset, long limit);
 
-    ApiResponse getActiveAgents(String session);
+    List<AgentInfo> getActiveAgents(String session);
 
-    ApiResponse send(String msg, String destAgent, String session);
+    boolean send(String msg, String destAgent, String session);
 
-    ApiResponse disconnect(String session);
+    boolean disconnect(String session);
 
 }

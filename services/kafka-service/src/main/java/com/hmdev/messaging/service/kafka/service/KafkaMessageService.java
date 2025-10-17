@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 public class KafkaMessageService implements EventMessageService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaMessageService.class);
+    private static final int REGEX_LIMIT = 256;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -127,13 +128,38 @@ public class KafkaMessageService implements EventMessageService {
     }
 
     private boolean matchRecipient(EventMessage eventMessage, String recipient) {
-        if (recipient == null) {
-            return true;
-        }
+        if (recipient == null) return true;
 
         String from = eventMessage.getFrom();
         String to = eventMessage.getTo();
 
-        return !from.equals(recipient) && (CommonUtils.isEmpty(to) || to.equals(recipient) || recipient.matches(to));
+        // Message source is same as destination, ignore
+        if (from == null || recipient.equals(from)) return false;
+
+        if (CommonUtils.isEmpty(to)) return true;
+
+        // Private Message mode
+        if (recipient.equals(to)) return true;
+
+        // Optional wildcard support only
+        if (to.contains("*")) {
+            return wildcardMatch(to, recipient);
+        }
+
+        return false;
     }
+
+    private boolean wildcardMatch(String pattern, String target) {
+        if (pattern == null) return false;
+        if (pattern.length() > REGEX_LIMIT) return false;
+
+        String regex = "^" + pattern.replace("*", ".*") + "$";
+        try {
+            return target.matches(regex);
+        } catch (Exception e) {
+            LOGGER.warn("Invalid recipient pattern: {}", pattern);
+            return false;
+        }
+    }
+
 }

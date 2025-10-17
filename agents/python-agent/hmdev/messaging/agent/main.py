@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 EXIT_COMMAND = "/python-agent:exit"
 
 class PrintHandler(AgentConnectionEventHandler):
+
     def __init__(self, agent_connection: AgentConnection, wait_event: threading.Event):
         self.wait_event = wait_event
         self.agent_connection = agent_connection
@@ -56,7 +57,7 @@ def main():
 
     args = parser.parse_args()
 
-    agent = AgentConnection(args.url, args.agent_name)
+    agent = AgentConnection(args.url)
 
     # handle Ctrl+C and termination signals
     def shutdown_handler(signum, frame):
@@ -67,7 +68,7 @@ def main():
     signal.signal(signal.SIGTERM, shutdown_handler)  # kill
 
     try:
-        connected = agent.connect(args.channel, args.password)
+        connected = agent.connect(args.channel, args.password, args.agent_name)
         if not connected:
             print("Failed to connect")
             return

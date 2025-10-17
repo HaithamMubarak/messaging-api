@@ -1,4 +1,4 @@
-package com.hmdev.messaging.service.kafka.data;
+package com.hmdev.messaging.common.data;
 
 import lombok.*;
 

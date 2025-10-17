@@ -1,16 +1,19 @@
 package com.hmdev.messaging.common;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdev.messaging.common.security.MySecurity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.HttpsURLConnection;
+import javax.crypto.Cipher;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,7 +21,7 @@ import java.util.Set;
 public class HttpClient {
     private static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
 
-    public static enum RequestMethod {
+    public enum RequestMethod {
 
         GET("get"),
         HEAD("head"),
@@ -29,9 +32,9 @@ public class HttpClient {
         OPTIONS("options"),
         TRACE("trace");
 
-        String value;
+        final String value;
 
-        private RequestMethod(String value) {
+        RequestMethod(String value) {
             this.value = value;
         }
 
@@ -51,29 +54,33 @@ public class HttpClient {
         }
     }
 
-    private long oldDate = System.currentTimeMillis();
+    private final long oldDate = System.currentTimeMillis();
+    private final int requestsLimit = 12;
+
     private int requests = 0;
-    private int requestsLimit = 12;
     private boolean enabled = true;
 
     private final String remoteUrl;
-
     private final Set<HttpURLConnection> pendingConnections;
+    private final ObjectMapper mapper;
+
+    private Cipher pubKeyEncryptor;
 
     public HttpClient(String remoteUrl) {
         this.remoteUrl = remoteUrl;
-        pendingConnections = new HashSet<HttpURLConnection>();
+        pendingConnections = new HashSet<>();
+        mapper = new ObjectMapper();
     }
 
-    public ApiResponse request(String url) {
+    public HttpClientResult request(String url) {
         return request(RequestMethod.GET, url, "", 0);
     }
 
-    public ApiResponse request(RequestMethod method, String url, String payload) {
+    public HttpClientResult request(RequestMethod method, String url, Object payload) {
         return request(method, url, payload, 0);
     }
 
-    public ApiResponse request(RequestMethod method, String url, String payload, int timeout) {
+    public HttpClientResult request(RequestMethod method, String url, Object payload, int timeout) {
         if (!enabled) {
             return null;
         }
@@ -90,7 +97,7 @@ public class HttpClient {
             enabled = true;
             requests = 0;
 
-            return new ApiResponse("error", "connection-reset");
+            return new HttpClientResult(0, "connection-reset");
         }
 
         url = getUrl(this.remoteUrl, url);
@@ -98,12 +105,13 @@ public class HttpClient {
         HttpURLConnection con = null;
         try {
 
-            if (method == RequestMethod.GET && payload != null && !payload.equals("")) {
-                url += "?data=" + URLEncoder.encode(payload, "UTF-8");
+            if (method == RequestMethod.GET && payload instanceof String && !CommonUtils.isEmpty(payload)) {
+                url += "?data=" + URLEncoder.encode(MySecurity.blocksEncrypt(this.pubKeyEncryptor, payload.toString()),
+                        StandardCharsets.UTF_8);
             }
 
-            logger.debug("\nSending '" + method + "' request to URL : " + url);
-            logger.debug("Payload : " + payload);
+            logger.debug("\nSending '{}' request to URL : {}", method, url);
+            logger.debug("Payload : {}", payload);
 
             URL urlObj = new URL(url);
             con = (HttpURLConnection) urlObj.openConnection();
@@ -119,10 +127,22 @@ public class HttpClient {
                 con.setConnectTimeout(timeout);
             }
 
-            if (method != RequestMethod.GET && payload != null && !payload.equals("")) {
+            if (method != RequestMethod.GET && !CommonUtils.isEmpty(payload)) {
                 con.setDoOutput(true);
                 DataOutputStream wr = new DataOutputStream(con.getOutputStream());
-                wr.writeBytes(payload);
+
+                String payloadString;
+
+                if (payload instanceof String) {
+                    payloadString = payload.toString();
+                    wr.writeBytes(payload.toString());
+                }
+                else
+                {
+                    payloadString =  mapper.writeValueAsString(payload);
+                }
+
+                wr.writeBytes(MySecurity.blocksEncrypt(this.pubKeyEncryptor, payloadString));
                 wr.flush();
                 wr.close();
             }
@@ -131,9 +151,9 @@ public class HttpClient {
                     new InputStreamReader(con.getInputStream()));
 
             int responseCode = con.getResponseCode();
-            logger.debug("Response Code : " + responseCode);
+            logger.debug("Response Code : {}", responseCode);
 
-            StringBuffer response = new StringBuffer();
+            StringBuilder response = new StringBuilder();
 
             char[] buff = new char[1024];
 
@@ -147,21 +167,14 @@ public class HttpClient {
 
             in.close();
 
-            if (con.getResponseCode() == HttpsURLConnection.HTTP_OK) {
-                return new ApiResponse("success", response.toString());
-            } else {
-                return new ApiResponse("error", response.toString());
-            }
+            HttpClientResult result = new HttpClientResult(con.getResponseCode(), response.toString());
 
-        } catch (java.net.SocketTimeoutException e) {
-            logger.error("Unexpected error", e);
-            return new ApiResponse("error", "connection-timeout:" + e.getLocalizedMessage());
-        } catch (java.io.IOException e) {
-            logger.error("Unexpected error", e);
-            return new ApiResponse("error", "io-error:" + e.getLocalizedMessage());
+            logger.debug("HttpClient result : {}", result);
+
+            return result;
+
         } catch (Exception e) {
-            logger.error("Unexpected error", e);
-            return new ApiResponse("error", "exception:" + e.getLocalizedMessage());
+            throw new RuntimeException(e);
         } finally {
             if (con != null) {
                 con.disconnect();
@@ -170,30 +183,16 @@ public class HttpClient {
         }
     }
 
+    public void setPublicKeyEncryptor(Cipher pubKeyEncryptor) {
+        this.pubKeyEncryptor = pubKeyEncryptor;
+    }
+
     private static String getUrl(String base, String relative) {
         String url = base + "/" + relative;
         url = url.replaceAll("\\\\", "/").replaceAll("/+", "/").replace(":/", "://");
 
         return url;
     }
-
-    private static String[] parseKeyValue(String token) {
-        if (token == null || token.equals("")) {
-            return null;
-        }
-
-        token = token.trim();
-
-        int index = token.indexOf("=");
-
-        if (index == -1) {
-            return new String[]{token.trim(), ""};
-        } else {
-            return new String[]{token.substring(0, index).trim(), token.substring(index + 1).trim()};
-        }
-
-    }
-
 
     public void closeAll() {
 

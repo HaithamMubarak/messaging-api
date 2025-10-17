@@ -43,10 +43,10 @@ public class Main {
         }
 
         CountDownLatch latch = new CountDownLatch(1);
-        AgentConnection agentConnection = new AgentConnection(apiUrl, agentName);
+        AgentConnection agentConnection = new AgentConnection(apiUrl);
 
         try {
-            agentConnection.connect(channel, password);
+            agentConnection.connect(channel, password, agentName);
 
             List<AgentInfo> agentsResults = agentConnection.getActiveAgents();
             logger.info("agentsResults: {}", agentsResults);

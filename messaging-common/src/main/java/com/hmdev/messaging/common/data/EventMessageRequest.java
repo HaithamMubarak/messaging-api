@@ -1,15 +1,13 @@
-package com.hmdev.messaging.service.kafka.data;
+package com.hmdev.messaging.common.data;
 
 
-import com.hmdev.messaging.common.data.EventMessage;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
+@SuperBuilder
 public class EventMessageRequest extends EventMessage {
-
     private String sessionId;
-
 }

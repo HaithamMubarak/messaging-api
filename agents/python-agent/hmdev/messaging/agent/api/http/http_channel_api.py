@@ -1,15 +1,15 @@
 import json
 import logging
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 import requests
 from hmdev.messaging.agent.api.connection_channel_api import ConnectionChannelApi
-from hmdev.messaging.agent.util.api_response import ApiResponse, Status
+from hmdev.messaging.agent.api.models import ConnectResponse, EventMessageResult, AgentInfo
 from hmdev.messaging.agent.util.http_client import HttpClient
 from hmdev.messaging.agent.security.my_security import MySecurity
 
 # 4 SECONDS
-POLLING_TIMEOUT=40
+POLLING_TIMEOUT = 40
 
 logger = logging.getLogger(__name__)
 
@@ -26,101 +26,136 @@ class HTTPChannelApi(ConnectionChannelApi):
     def _url(self, action: str) -> str:
         return f"/{action}?use-pubkey={str(self.use_public_key).lower()}"
 
-    def connect(self, channel_name: str, channel_key: str, agent_name: str, session_id: Optional[str] = None) -> ApiResponse:
-        self.channel_secret = MySecurity.derive_channel_secret(channel_name, channel_key)
-
-        payload = {
-            "channelName": channel_name,
-            "channelPassword": MySecurity.hash(channel_key, self.channel_secret),
-            "agentName": agent_name,
-            "agentContext": self.create_agent_context()
-        }
-
-        if session_id:
-            payload["sessionId"] = session_id
+    def connect(self, channel_name: str, channel_key: str, agent_name: str, session_id: Optional[str] = None) -> ConnectResponse:
         try:
-            txt = self.client.request("POST", self._url("connect"), json_body=payload)
-            data = json.loads(txt)['data']
-            return ApiResponse(Status.SUCCESS, json.dumps(data))
-        except Exception as e:
-            return ApiResponse(Status.ERROR, str(e))
+            self.channel_secret = MySecurity.derive_channel_secret(channel_name, channel_key)
+            payload = {
+                "channelName": channel_name,
+                "channelPassword": MySecurity.hash(channel_key, self.channel_secret),
+                "agentName": agent_name,
+                "agentContext": self.create_agent_context()
+            }
 
-    def receive(self, session: str, startOffset: int, limit : int) -> ApiResponse:
-        params = {"sessionId": session, "offsetRange": {"startOffset": start, "limit": limit}}
+            if session_id:
+                payload["sessionId"] = session_id
+
+            response_text = self.client.request("POST", self._url("connect"), json_body=payload)
+
+            # Try to parse JSON response defensively
+            try:
+                json_data = json.loads(response_text)
+            except Exception:
+                json_data = None
+
+            # server uses {status: 'success', data: {...}}
+            if isinstance(json_data, dict) and str(json_data.get('status')) == 'success':
+                data = json_data.get('data', {})
+                session = None
+                date = None
+                if isinstance(data, dict):
+                    session = data.get('sessionId') or data.get('session')
+                    date = data.get('date')
+                return ConnectResponse(sessionId=session, date=date, raw=data)
+
+            # fallback: if server returned plain JSON object with sessionId
+            if isinstance(json_data, dict):
+                session = json_data.get('sessionId') or json_data.get('session')
+                return ConnectResponse(sessionId=session, raw=json_data)
+
+            # plain string session id
+            if isinstance(response_text, str) and response_text.strip():
+                return ConnectResponse(sessionId=response_text.strip(), raw=response_text)
+
+        except Exception as e:
+            logger.error("Unable to connect to the channel: %s", e)
+
+        return ConnectResponse()
+
+    def receive(self, session_id: str, start_offset: int, limit: int) -> Optional[EventMessageResult]:
+        params = {"sessionId": session_id, "offsetRange": {"startOffset": start_offset, "limit": limit}}
         try:
             txt = self.client.request("POST", self._url("receive"), json_body=params, timeout=POLLING_TIMEOUT)
 
-            # Expecting JSON list and optional updateLength
+            # Expecting JSON like {status: 'success', data: {events: [...], nextOffset: N}}
             obj = json.loads(txt)
-            if obj['status'] == 'success':
-                obj = obj['data']
-                cipher_array = obj.get("events", [])
-                data_array = []
+            if isinstance(obj, dict) and str(obj.get('status')) == 'success':
+                data = obj.get('data', {})
+                if not isinstance(data, dict):
+                    return EventMessageResult(events=[], nextOffset=None)
+                cipher_array = data.get('events', [])
+                data_array: List[Dict[str, Any]] = []
 
                 for item in cipher_array:
-                    if item.get("encrypted"):
-                        plain = MySecurity.decrypt_and_verify(item.get("content", {}), self.channel_secret)
-
-                        if not plain:  # None or empty string
-                            item = {}
-                        else:
-                            item.pop("content", None)
-                            item.pop("encrypted", None)
-                            item["content"] = plain
+                    if isinstance(item, dict) and item.get("encrypted"):
+                        plain = MySecurity.decrypt_and_verify(item.get("content", ""), self.channel_secret)
+                        item["content"] = plain
+                        item["encrypted"] = False
 
                     data_array.append(item)
 
-                if isinstance(obj, dict) and "updateLength" in obj:
-                    return ApiResponse(Status.SUCCESS, json.dumps(data_array), obj.get("updateLength"))
+                return EventMessageResult(events=data_array, nextOffset=data.get('nextOffset'))
 
-            return ApiResponse(Status.SUCCESS, txt)
-        except requests.exceptions.Timeout as timeout_exc:
-            logger.warning(f"Request timed out: {timeout_exc}")
-            return ApiResponse(Status.ERROR, "Request timed out")
+            # fallback: if server returned raw list
+            if isinstance(obj, list):
+                return EventMessageResult(events=obj, nextOffset=None)
+
+        except requests.exceptions.Timeout:
+            logger.warning("Receive request timed out")
+            return EventMessageResult(events=[], nextOffset=None)
         except Exception as exception:
             logger.warning(exception)
-            return ApiResponse(Status.ERROR, str(exception))
+            return None
 
-    def get_active_agents(self, session: str) -> ApiResponse:
-        params = {"sessionId": session}
+        return None
+
+    def get_active_agents(self, session_id: str) -> Optional[List[AgentInfo]]:
+        params = {"sessionId": session_id}
         try:
             txt = self.client.request("POST", self._url("list-agents"), json_body=params)
-            # Expecting JSON list and optional updateLength
-            try:
-                obj = json.loads(txt)
-                return ApiResponse(Status.SUCCESS, obj['data'])
-            except Exception as exception:
-                logger.warning(exception)
-                pass
-            return ApiResponse(Status.SUCCESS, txt)
-        except Exception as e:
-            return ApiResponse(Status.ERROR, str(e))
+            obj = json.loads(txt)
+            data: List[Any] = []
+            if isinstance(obj, dict) and str(obj.get('status')) == 'success':
+                data = obj.get('data', [])
 
-    def send(self, msg: str, to_agent: Optional[str], session: str) -> ApiResponse:
+            agents: List[AgentInfo] = []
+            for item in data:
+                if isinstance(item, dict):
+                    agents.append(AgentInfo(agentName=item.get('agentName', ''), lastSeen=item.get('date'), meta=item))
+            return agents
+
+        except Exception as e:
+            logger.warning(e)
+            return None
+
+    def send(self, msg: str, to_agent: Optional[str], session_id: str) -> bool:
         payload = {
             "type": "chat-text",
-            "to" : to_agent,
-            "encrypted" : True,
+            "to": to_agent,
+            "encrypted": True,
             "content": MySecurity.encrypt_and_sign(msg, self.channel_secret),
-            "sessionId": session
+            "sessionId": session_id
         }
         try:
             txt = self.client.request("POST", self._url("event"), json_body=payload)
-            return ApiResponse(Status.SUCCESS, txt)
+            obj = json.loads(txt)
+            return isinstance(obj, dict) and str(obj.get('status')) == 'success'
         except Exception as e:
-            return ApiResponse(Status.ERROR, str(e))
+            logger.warning(e)
+            return False
 
-    def disconnect(self, channel_key: str, session: str) -> ApiResponse:
-        payload = {"key": channel_key, "sessionId": session}
+    def disconnect(self, session_id: str) -> bool:
+        payload = {"sessionId": session_id}
         try:
             txt = self.client.request("POST", self._url("disconnect"), json_body=payload)
             self.client.close_all()
-            return ApiResponse(Status.SUCCESS, txt)
+            obj = json.loads(txt)
+            return isinstance(obj, dict) and str(obj.get('status')) == 'success'
         except Exception as e:
-            return ApiResponse(Status.ERROR, str(e))
+            logger.warning(e)
+            return False
 
     def create_agent_context(self):
         return {
-            "agentType" : "PYTHON-AGENT",
+            "agentType": "PYTHON-AGENT",
             "descriptor": "hmdev/messaging/agent/api/http/http_channel_api.py"
         }

@@ -1,9 +1,7 @@
 package com.hmdev.messaging.service.kafka.controller;
 
 import com.hmdev.messaging.common.CommonUtils;
-import com.hmdev.messaging.common.data.AgentInfo;
-import com.hmdev.messaging.common.data.EventMessage;
-import com.hmdev.messaging.common.data.EventMessageResult;
+import com.hmdev.messaging.common.data.*;
 import com.hmdev.messaging.common.security.MySecurity;
 import com.hmdev.messaging.common.session.SessionInfo;
 import com.hmdev.messaging.common.session.GenericSessionManager;
@@ -76,7 +74,7 @@ public class MessagingController {
 
         if (!sessionExists)
         {
-            kafkaMessageService.send(channelId, new EventMessage(agentName, ".*", EventMessage.EventType.CONNECT,
+            kafkaMessageService.send(channelId, new EventMessage(agentName, "*", EventMessage.EventType.CONNECT,
                     false, null, timestamp));
         }
         sessionManager.putSession(sessionId, new SessionInfo(channelId, agentInfo));
@@ -102,6 +100,7 @@ public class MessagingController {
 
         EventMessage eventMessage = new EventMessage(eventMessageRequest);
         eventMessage.setFrom(sessionInfo.getAgentInfo().getAgentName());
+        eventMessage.setDate(timestamp);
 
         kafkaMessageService.send(sessionInfo.getChannelId(), eventMessage);
 
@@ -138,7 +137,7 @@ public class MessagingController {
         long timestamp = System.currentTimeMillis();
         SessionInfo sessionInfo = fetchSessionInfo(sessionRequest.getSessionId());
         AgentInfo agentInfo = sessionInfo.getAgentInfo();
-        kafkaMessageService.send(sessionInfo.getChannelId(), new EventMessage(agentInfo.getAgentName(), ".*",
+        kafkaMessageService.send(sessionInfo.getChannelId(), new EventMessage(agentInfo.getAgentName(), "*",
                 EventMessage.EventType.DISCONNECT, false, null, timestamp));
         sessionManager.removeSession(sessionRequest.getSessionId());
 

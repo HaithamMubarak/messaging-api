@@ -1,22 +1,24 @@
 package com.hmdev.messaging.agent.api.http;
 
 
-import com.hmdev.messaging.common.ApiResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdev.messaging.common.HttpClientResult;
 import com.hmdev.messaging.common.HttpClient;
-import com.hmdev.messaging.common.data.EventMessage;
+import com.hmdev.messaging.common.data.*;
 import com.hmdev.messaging.common.security.MySecurity;
 import com.hmdev.messaging.common.security.PemIO;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 import java.io.ByteArrayInputStream;
 import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.crypto.Cipher;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import com.hmdev.messaging.agent.api.ConnectionChannelApi;
 
@@ -30,160 +32,155 @@ public class HTTPChannelApi implements ConnectionChannelApi {
     private static final int POLLING_TIMEOUT = 40;
 
     // Keep this set to false. A public key may be needed in the future, but HTTPS is sufficient for now.
+    @Setter
     private boolean usePublicKey = false;
 
     private final HttpClient client;
-    private Cipher pubKeyEncryptor;
+    private final ObjectMapper objectMapper;
 
     private String channelSecret;
 
     public HTTPChannelApi(String remoteUrl) {
         this.client = new HttpClient(remoteUrl);
+        this.objectMapper = new ObjectMapper();
     }
 
     @Override
-    public ApiResponse connect(String channelName, String channelKey, String agentName) throws Exception {
+    public ConnectResponse connect(String channelName, String channelKey, String agentName)  {
         return connect(channelName, channelKey, agentName, null);
     }
 
     @Override
-    public ApiResponse connect(String channelName, String channelKey, String agentName, String sessionId) throws Exception {
+    public ConnectResponse connect(String channelName, String channelKey, String agentName, String sessionId)  {
+        try {
+            if (usePublicKey) {
+                HttpClientResult publicKeyResponse = this.getPublicKey();
 
-        if (usePublicKey) {
-            ApiResponse publicKeyResponse = this.getPublicKey();
-
-            if (publicKeyResponse.status() == ApiResponse.Status.ERROR) {
-                throw new Exception("Unable to get the public key");
-            }
-            PublicKey publicKey = PemIO.readPublicKey(new ByteArrayInputStream(publicKeyResponse.getData().getBytes()));
-            pubKeyEncryptor = Cipher.getInstance("RSA");
-            pubKeyEncryptor.init(Cipher.ENCRYPT_MODE, publicKey);
-        }
-
-        this.channelSecret = MySecurity.deriveChannelSecret(channelName, channelKey);
-
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("channelName", channelName);
-        jsonObject.put("channelPassword", MySecurity.hash(channelKey, this.channelSecret));
-        jsonObject.put("agentName", agentName);
-        jsonObject.put("agentContext", createAgentContext());
-        jsonObject.put("sessionId", sessionId);
-
-        String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
-
-        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("connect"), cipherPayload);
-
-        if (apiResponse.status() == ApiResponse.Status.SUCCESS) {
-
-            JSONObject data = apiResponse.asJsonResponse().getJsonData().optJSONObject("data");
-
-            return new ApiResponse(ApiResponse.Status.SUCCESS, data);
-
-        } else {
-            return apiResponse;
-        }
-    }
-
-    @Override
-    public ApiResponse receive(String session, long start, long end) {
-
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("sessionId", session);
-
-        JSONObject rangeJson = new JSONObject();
-        rangeJson.put("start", start);
-        rangeJson.put("end", end);
-
-        jsonObject.put("range", rangeJson);
-
-        String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
-
-        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("receive"), cipherPayload, POLLING_TIMEOUT * 1000);
-
-        if (apiResponse.status() == ApiResponse.Status.SUCCESS) {
-            JSONObject receivedJson = apiResponse.asJsonResponse().getJsonData().optJSONObject("data");
-            JSONArray cipherArray = receivedJson.getJSONArray("events");
-            JSONArray dataArray = new JSONArray();
-
-            for (int i = 0; i < cipherArray.length(); i++) {
-
-                JSONObject item = cipherArray.getJSONObject(i);
-
-                if (item.optBoolean("encrypted")) {
-
-                    String plain = MySecurity.decryptAndVerify(item.optString("content"), channelSecret);
-
-                    if (plain == null || plain.isEmpty()) {
-                        item = new JSONObject();
-                    } else {
-                        item.remove("content");
-                        item.put("content", plain);
-                        item.put("encrypted", false);
-                    }
+                if (publicKeyResponse.isHttpOk()) {
+                    throw new Exception("Unable to get the public key");
                 }
-
-                dataArray.put(item);
+                PublicKey publicKey = PemIO.readPublicKey(new ByteArrayInputStream(publicKeyResponse.getData().getBytes()));
+                Cipher pubKeyEncryptor = Cipher.getInstance("RSA");
+                pubKeyEncryptor.init(Cipher.ENCRYPT_MODE, publicKey);
+                client.setPublicKeyEncryptor(pubKeyEncryptor);
             }
 
-            return new ApiResponse(ApiResponse.Status.SUCCESS, dataArray.toString(),
-                    receivedJson.optLongObject("nextOffset"));
+            this.channelSecret = MySecurity.deriveChannelSecret(channelName, channelKey);
 
-        } else {
-            return apiResponse;
+            ConnectRequest connectRequest = new ConnectRequest(channelName, MySecurity.hash(channelKey, this.channelSecret),
+                    agentName, createAgentContext());
+            connectRequest.setSessionId(sessionId);
+
+            HttpClientResult httpClientResult = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("connect"),
+                    connectRequest);
+
+            if (httpClientResult.isHttpOk()) {
+                return objectMapper.readValue(
+                        httpClientResult.dataAsJsonObject().optJSONObject("data").toString(), ConnectResponse.class);
+            }
+        } catch (Exception e) {
+            logger.error("Exception caught in connect operation {}", e.getLocalizedMessage());
         }
+        logger.debug("Unable to connect to the channel");
+        return new ConnectResponse();
     }
 
     @Override
-    public ApiResponse getActiveAgents(String session) {
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("sessionId", session);
+    public EventMessageResult receive(String sessionId, long startOffset, long limit) {
+        EventMessageResult eventMessageResult = new EventMessageResult(new ArrayList<>(), startOffset);
+        try {
+            MessageReceiveRequest messageReceiveRequest = new MessageReceiveRequest();
+            messageReceiveRequest.setSessionId(sessionId);
+            messageReceiveRequest.setOffsetRange(new OffsetRange(startOffset, limit));
 
-        ApiResponse apiResponse = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("list-agents"), jsonObject.toString());
+            HttpClientResult httpClientResult = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("receive"),
+                    messageReceiveRequest, POLLING_TIMEOUT * 1000);
 
-        if (apiResponse.status() == ApiResponse.Status.SUCCESS) {
 
-            String dataJson = apiResponse.asJsonResponse().getJsonData().optJSONArray("data").toString();
+            if (httpClientResult.isHttpOk())
+            {
+                eventMessageResult = objectMapper.readValue(httpClientResult.dataAsJsonObject().optJSONObject("data").toString(),
+                        EventMessageResult.class);
+            }
 
-            return new ApiResponse(ApiResponse.Status.SUCCESS, dataJson);
+            for (EventMessage event : eventMessageResult.getEvents()) {
+                if (event.isEncrypted()) {
+                    String plain = MySecurity.decryptAndVerify(event.getContent(), channelSecret);
+                    event.setEncrypted(false);
+                    event.setContent(plain);
+                }
+            }
 
-        } else {
-            return apiResponse;
+        } catch (Exception e) {
+            logger.error("Exception for receive operation: {}", e.getMessage());
         }
+        return eventMessageResult;
     }
 
     @Override
-    public ApiResponse send(String msg, String destAgent, String session) {
+    public List<AgentInfo> getActiveAgents(String sessionId) {
+        try {
+            SessionRequest sessionRequest = new SessionRequest(sessionId);
 
-        JSONObject msgPayload = new JSONObject();
-        msgPayload.put("type", EventMessage.EventType.CHAT_TEXT);
-        msgPayload.put("to", destAgent);
-        msgPayload.put("encrypted", true);
-        msgPayload.put("content", MySecurity.encryptAndSign(msg, channelSecret));
-        msgPayload.put("sessionId", session);
+            HttpClientResult httpClientResult = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("list-agents"),
+                    sessionRequest);
 
-        String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, msgPayload.toString());
+            if (httpClientResult.isHttpOk()) {
+                return objectMapper.readValue(httpClientResult.dataAsJsonObject().optJSONArray("data").toString(),
+                        new TypeReference<>() {
+                        });
+            }
 
-        return this.client.request(HttpClient.RequestMethod.POST, getActionUrl("event"), cipherPayload);
+        } catch (Exception e) {
+            logger.error("Exception for getActiveAgents operation: {}", e.getMessage());
+        }
+        return new ArrayList<>();
     }
 
     @Override
-    public ApiResponse disconnect(String session) {
+    public boolean send(String msg, String destination, String sessionId) {
 
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("sessionId", session);
+        try {
+            EventMessageRequest eventMessageRequest = new EventMessageRequest();
 
-        String cipherPayload = MySecurity.blocksEncrypt(this.pubKeyEncryptor, jsonObject.toString());
+            eventMessageRequest.setSessionId(sessionId);
+            eventMessageRequest.setType(EventMessage.EventType.CHAT_TEXT);
+            eventMessageRequest.setTo(destination);
+            eventMessageRequest.setEncrypted(true);
+            eventMessageRequest.setContent(MySecurity.encryptAndSign(msg, channelSecret));
 
+            return this.client.request(HttpClient.RequestMethod.POST,
+                    getActionUrl("event"), eventMessageRequest).isHttpOk();
+        }
+        catch (Exception e) {
+            logger.error("Exception for send operation: {}", e.getMessage());
+        }
 
-        ApiResponse response = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("disconnect"), cipherPayload);
-
-        this.client.closeAll();
-
-        return response;
-
+        return false;
     }
 
-    private ApiResponse getPublicKey() {
+    @Override
+    public boolean disconnect(String sessionId) {
+
+        try {
+            SessionRequest sessionRequest = new SessionRequest(sessionId);
+
+            HttpClientResult response = this.client.request(HttpClient.RequestMethod.POST, getActionUrl("disconnect"),
+                    sessionRequest);
+
+            this.client.closeAll();
+
+            return response.isHttpOk();
+        }
+        catch (Exception exception)
+        {
+            logger.error("Exception for disconnect operation: {}", exception.getMessage());
+        }
+
+        return false;
+    }
+
+    private HttpClientResult getPublicKey() {
         return this.client.request(HttpClient.RequestMethod.GET, PUBLIC_KEY, null);
     }
 
@@ -191,10 +188,7 @@ public class HTTPChannelApi implements ConnectionChannelApi {
         return String.format("/%s?use-pubkey=%s", action, usePublicKey);
     }
 
-    private JSONObject createAgentContext() {
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("agentType", "JAVA-AGENT");
-        jsonObject.put("descriptor", HTTPChannelApi.class.getName());
-        return jsonObject;
+    private AgentInfo.AgentContext createAgentContext() {
+        return new AgentInfo.AgentContext("JAVA-AGENT", HTTPChannelApi.class.getName(), null);
     }
 }
