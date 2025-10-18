@@ -70,8 +70,9 @@ public class MessagingController {
             sessionId = java.util.UUID.randomUUID().toString();
         }
 
-        AgentInfo agentInfo = new AgentInfo(agentName, timestamp, connectRequest.getAgentContext());
+        AgentInfo agentInfo = new AgentInfo(agentName, connectRequest.getAgentContext());
         ChannelMetadata channelMetadata;
+        SessionInfo createdSessionInfo = new SessionInfo(channelId, agentInfo, 0L, timestamp, 0L);
         if (!sessionExists)
         {
             channelMetadata = kafkaMessageService.send(channelId, new EventMessage(agentName, "*", EventMessage.EventType.CONNECT,
@@ -82,7 +83,8 @@ public class MessagingController {
             channelMetadata = kafkaMessageService.getChannelMetdata(channelId, ChannelType.DEFAULT);
         }
 
-        sessionManager.putSession(sessionId, new SessionInfo(channelId, agentInfo));
+        // store session via session manager (RedisSessionManager handles caching internally)
+        sessionManager.putSession(sessionId, createdSessionInfo);
 
         ConnectResponse connectResponse = new ConnectResponse();
         connectResponse.setSessionId(sessionId);
@@ -99,7 +101,7 @@ public class MessagingController {
         long timestamp = System.currentTimeMillis();
 
         SessionInfo sessionInfo = fetchSessionInfo(eventMessageRequest.getSessionId());
-        sessionInfo.getAgentInfo().setDate(timestamp);
+        sessionInfo.setLastSeenTime(timestamp);
 
         // Update session timestamp
         sessionManager.putSession(eventMessageRequest.getSessionId(), sessionInfo);
@@ -118,10 +120,9 @@ public class MessagingController {
 
         long timestamp = System.currentTimeMillis();
 
-        SessionInfo sessionInfo = fetchSessionInfo(sessionRequest.getSessionId());
-        sessionInfo.getAgentInfo().setDate(timestamp);
-
         // Update session timestamp
+        SessionInfo sessionInfo = fetchSessionInfo(sessionRequest.getSessionId());
+        sessionInfo.setLastSeenTime(timestamp);
         sessionManager.putSession(sessionRequest.getSessionId(), sessionInfo);
 
         List<AgentInfo> activeAgents = sessionManager.getAgentsByChannel(sessionInfo.getChannelId());
@@ -131,9 +132,23 @@ public class MessagingController {
     @PostMapping(path = "/receive", consumes = MediaType.APPLICATION_JSON_VALUE)
     public JsonResponse receive(@RequestBody(required = false) MessageReceiveRequest messageReceiveRequest) {
 
+        long timestamp = System.currentTimeMillis();
+
         SessionInfo sessionInfo = fetchSessionInfo(messageReceiveRequest.getSessionId());
         EventMessageResult eventMessageResult =
-                kafkaMessageService.receive(sessionInfo.getChannelId(), sessionInfo.getAgentInfo().getAgentName(), messageReceiveRequest.getOffsetRange());
+                kafkaMessageService.receive(sessionInfo.getChannelId(), sessionInfo.getAgentInfo().getAgentName(),
+                        messageReceiveRequest.getOffsetRange());
+
+        // Update session timestamp, next offset and last read time
+        sessionInfo.setLastNextOffset(eventMessageResult.getNextOffset());
+        sessionInfo.setLastSeenTime(timestamp);
+        if (!eventMessageResult.getEvents().isEmpty())
+        {
+            sessionInfo.setLastReadTime( eventMessageResult.getEvents().get(eventMessageResult.getEvents().size() - 1).getDate());
+        }
+
+        // Update session timestamp
+        sessionManager.putSession(messageReceiveRequest.getSessionId(), sessionInfo);
 
         return JsonResponse.success(eventMessageResult);
     }
@@ -157,10 +172,13 @@ public class MessagingController {
     }
 
     private SessionInfo fetchSessionInfo(String sessionId) {
-        SessionInfo sessionInfo;
-        if (sessionId == null || (sessionInfo = sessionManager.getSession(sessionId)) == null) {
+        if (sessionId == null) {
             throw new RuntimeException("Agent session not found");
         }
-        return sessionInfo;
+
+        SessionInfo sessionInfo = sessionManager.getSession(sessionId);
+        if (sessionInfo != null) return sessionInfo;
+
+        throw new RuntimeException("Agent session not found");
     }
 }

@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import com.hmdev.messaging.service.kafka.cache.CacheService;
 
 @Service
 public class KafkaMessageService implements EventMessageService {
@@ -32,15 +33,17 @@ public class KafkaMessageService implements EventMessageService {
     private final ObjectMapper mapper = new ObjectMapper();
     private final KafkaConsumerPool kafkaConsumerPool;
     private final IChannelTopicProvider channelTopicProvider;
+    private final CacheService cacheService;
 
     @Value("${messaging.pollingTimeout:35}")
     private long pollingTimeout;
 
     public KafkaMessageService(KafkaTemplate<String, String> kafkaTemplate, IChannelTopicProvider channelTopicProvider,
-                               KafkaConsumerPool kafkaConsumerPool) {
+                               KafkaConsumerPool kafkaConsumerPool, CacheService cacheService) {
         this.kafkaTemplate = kafkaTemplate;
         this.channelTopicProvider = channelTopicProvider;
         this.kafkaConsumerPool = kafkaConsumerPool;
+        this.cacheService = cacheService;
     }
 
     @Override
@@ -69,6 +72,14 @@ public class KafkaMessageService implements EventMessageService {
                         result.getRecordMetadata().offset(),
                         key
                 );
+
+                // Cache the sent message for quick real-time fetch (TTL 5 minutes)
+                try {
+                    String cacheKey = key + ":" + result.getRecordMetadata().offset();
+                    cacheService.putKafkaMessage(cacheKey, event);
+                } catch (Exception e) {
+                    LOGGER.warn("Failed to cache kafka message for channel {}: {}", channelId, e.getMessage());
+                }
             }
 
             // return metadata (topic name and channelId) to caller

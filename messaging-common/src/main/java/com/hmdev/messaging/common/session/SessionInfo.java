@@ -9,7 +9,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SessionInfo {
-
     private String channelId;
     private AgentInfo agentInfo;
+    private Long lastNextOffset;
+    private Long lastSeenTime;
+    private Long lastReadTime;
 }

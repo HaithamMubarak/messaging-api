@@ -9,9 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AgentInfo {
-    private String agentName;
 
-    private long date;
+    private String agentName;
 
     @JsonProperty("agentContext")
     private AgentContext agentContext;

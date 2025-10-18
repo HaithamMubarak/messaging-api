@@ -3,16 +3,16 @@ package com.hmdev.messaging.common.data;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.util.Map;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
+@SuperBuilder
 public class EventMessage {
 
     private String from;
@@ -22,7 +22,7 @@ public class EventMessage {
     private String content;
     private long date;
 
-    @Builder.Default
+    @lombok.Builder.Default
     private Map<String, String> otherProperties = Map.of();
 
     public EventMessage(String from, String to, EventType type, boolean encrypted, String content, long date) {

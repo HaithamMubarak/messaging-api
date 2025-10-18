@@ -2,10 +2,8 @@ package com.hmdev.messaging.service.kafka.udb;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hmdev.messaging.common.data.ConnectRequest;
 import com.hmdev.messaging.common.data.EventMessageRequest;
 import com.hmdev.messaging.common.data.MessageReceiveRequest;
-import com.hmdev.messaging.common.data.SessionRequest;
 import com.hmdev.messaging.service.kafka.controller.MessagingController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,8 +80,6 @@ public class UdpDatagramListener {
             t.setDaemon(true);
             return t;
         });
-        // Run the listening loop on the executor; each incoming packet will also
-        // be submitted to the same pool and handled concurrently.
         executor.submit(this::listenLoop);
         LOGGER.info("UDP listener started on port {}", port);
     }
