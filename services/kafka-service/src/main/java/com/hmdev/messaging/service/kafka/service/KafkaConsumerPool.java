@@ -24,7 +24,7 @@ public class KafkaConsumerPool {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    @Value("${spring.kafka.consumers.pool.size}")
+    @Value("${spring.kafka.consumers.pool.size:10}")
     private int poolSize;
 
     @PostConstruct

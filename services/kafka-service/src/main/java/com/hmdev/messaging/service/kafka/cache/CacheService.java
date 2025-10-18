@@ -9,21 +9,21 @@ import java.util.List;
  */
 public interface CacheService {
 
-    <T> T getSession(String sessionId, Class<T> clazz) throws Exception;
+    <T> T getSession(String sessionId, Class<T> clazz);
 
-    void putSession(String sessionId, Object session) throws Exception;
+    void putSession(String sessionId, Object session);
 
     // remove is kept for backward compatibility; evictSession is the preferred name
-    void remove(String sessionId) throws Exception;
+    void remove(String sessionId);
 
-    void evictSession(String sessionId) throws Exception;
+    void evictSession(String sessionId);
 
-    void putKafkaMessage(String cacheKey, Object message) throws Exception;
+    void putKafkaMessage(String cacheKey, Object message);
 
-    <T> List<T> getKafkaMessages(String cacheKey, Class<T> clazz) throws Exception;
+    <T> List<T> getKafkaMessages(String cacheKey, Class<T> clazz);
 
     // Convenience: return the last (most recent) kafka message for the key, or null if none
-    default <T> T getKafkaMessage(String cacheKey, Class<T> clazz) throws Exception {
+    default <T> T getKafkaMessage(String cacheKey, Class<T> clazz) {
         List<T> list = getKafkaMessages(cacheKey, clazz);
         if (list == null || list.isEmpty()) return null;
         return list.get(list.size() - 1);

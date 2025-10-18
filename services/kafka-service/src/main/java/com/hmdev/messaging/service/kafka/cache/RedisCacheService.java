@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Redis-backed implementation of CacheService.
- * Stores JSON-serialized values using StringRedisTemplate and applies TTLs defined in CacheKeys.
+ * Stores JSON-serialized values using StringRedisTemplate and applies configured TTLs.
  */
 @Service
 public class RedisCacheService implements CacheService {
@@ -32,15 +32,8 @@ public class RedisCacheService implements CacheService {
         this.cacheProperties = cacheProperties;
     }
 
-    // For tests or manual construction
-    public RedisCacheService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper, CacheProperties cacheProperties, boolean forTest) {
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
-        this.cacheProperties = cacheProperties;
-    }
-
     @Override
-    public <T> T getSession(String sessionId, Class<T> clazz) throws Exception {
+    public <T> T getSession(String sessionId, Class<T> clazz) {
         String key = cacheProperties.getSessionPrefix() + sessionId;
         String json = redisTemplate.opsForValue().get(key);
         if (json == null) return null;
@@ -48,41 +41,41 @@ public class RedisCacheService implements CacheService {
             return objectMapper.readValue(json, clazz);
         } catch (Exception e) {
             LOGGER.warn("Failed to deserialize session {} from redis: {}", sessionId, e.getMessage());
-            throw e;
+            throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void putSession(String sessionId, Object session) throws Exception {
+    public void putSession(String sessionId, Object session) {
         String key = cacheProperties.getSessionPrefix() + sessionId;
         try {
             String json = objectMapper.writeValueAsString(session);
             redisTemplate.opsForValue().set(key, json, Duration.ofSeconds(cacheProperties.getSessionTtlSeconds()));
         } catch (Exception e) {
             LOGGER.warn("Failed to put session {} into redis: {}", sessionId, e.getMessage());
-            throw e;
+            throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void remove(String sessionId) throws Exception {
+    public void remove(String sessionId) {
         String key = cacheProperties.getSessionPrefix() + sessionId;
         try {
             redisTemplate.delete(key);
         } catch (Exception e) {
             LOGGER.warn("Failed to evict session {} from redis: {}", sessionId, e.getMessage());
-            throw e;
+            throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void evictSession(String sessionId) throws Exception {
+    public void evictSession(String sessionId) {
         // delegate to remove for backward compatibility
         remove(sessionId);
     }
 
     @Override
-    public void putKafkaMessage(String cacheKey, Object message) throws Exception {
+    public void putKafkaMessage(String cacheKey, Object message) {
         String key = cacheProperties.getKafkaMsgPrefix() + cacheKey;
         try {
             String json = objectMapper.writeValueAsString(message);
@@ -100,12 +93,12 @@ public class RedisCacheService implements CacheService {
             redisTemplate.expire(key, Duration.ofSeconds(cacheProperties.getKafkaMessageTtlSeconds()));
         } catch (Exception e) {
             LOGGER.warn("Failed to put kafka message {} into redis: {}", cacheKey, e.getMessage());
-            throw e;
+            throw new RuntimeException(e);
         }
     }
 
     @Override
-    public <T> List<T> getKafkaMessages(String cacheKey, Class<T> clazz) throws Exception {
+    public <T> List<T> getKafkaMessages(String cacheKey, Class<T> clazz) {
         String key = cacheProperties.getKafkaMsgPrefix() + cacheKey;
         List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
 

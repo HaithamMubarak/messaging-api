@@ -3,7 +3,6 @@ package com.hmdev.messaging.service.kafka.session;
 import com.hmdev.messaging.common.data.AgentInfo;
 import com.hmdev.messaging.common.session.GenericSessionManager;
 import com.hmdev.messaging.common.session.SessionInfo;
-import com.hmdev.messaging.service.kafka.cache.CacheKeys;
 import com.hmdev.messaging.service.kafka.cache.CacheProperties;
 import com.hmdev.messaging.service.kafka.cache.CacheService;
 import org.slf4j.Logger;
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,7 +41,7 @@ public class RedisSessionManager implements GenericSessionManager {
             // If there was a previous session, remove it from its channel set if channel changed
             SessionInfo old = cacheService.getSession(sessionId, SessionInfo.class);
             if (old != null && !old.getChannelId().equals(info.getChannelId())) {
-                String oldSet = CacheKeys.CHANNEL_SESSIONS_PREFIX + old.getChannelId();
+                String oldSet = cacheProperties.getChannelSessionsPrefix() + old.getChannelId();
                 redisTemplate.opsForSet().remove(oldSet, sessionId);
             }
         } catch (Exception e) {
@@ -55,7 +55,7 @@ public class RedisSessionManager implements GenericSessionManager {
         }
 
         // Add sessionId to channel set
-        String setKey = CacheKeys.CHANNEL_SESSIONS_PREFIX + info.getChannelId();
+        String setKey = cacheProperties.getChannelSessionsPrefix() + info.getChannelId();
         try {
             redisTemplate.opsForSet().add(setKey, sessionId);
             // refresh TTL on the set to match session TTL
@@ -89,14 +89,14 @@ public class RedisSessionManager implements GenericSessionManager {
 
     @Override
     public List<AgentInfo> getAgentsByChannel(String channelId) {
-        String setKey = CacheKeys.CHANNEL_SESSIONS_PREFIX + channelId;
+        String setKey = cacheProperties.getChannelSessionsPrefix() + channelId;
         try {
             Set<String> members = redisTemplate.opsForSet().members(setKey);
             if (members == null || members.isEmpty()) return new ArrayList<>();
             List<AgentInfo> result = members.stream().map(sessionId -> {
                 try {
-                    SessionInfo si = cacheService.getSession(sessionId, SessionInfo.class);
-                    if (si == null) {
+                    SessionInfo sessionInfo = cacheService.getSession(sessionId, SessionInfo.class);
+                    if (sessionInfo == null) {
                         // remove stale sessionId from the set
                         try {
                             redisTemplate.opsForSet().remove(setKey, sessionId);
@@ -105,12 +105,12 @@ public class RedisSessionManager implements GenericSessionManager {
                         }
                         return null;
                     }
-                    return si.getAgentInfo();
+                    return sessionInfo.getAgentInfo();
                 } catch (Exception e) {
                     LOGGER.debug("Failed to read session {} while listing channel {}: {}", sessionId, channelId, e.getMessage());
                     return null;
                 }
-            }).filter(a -> a != null).collect(Collectors.toList());
+            }).filter(Objects::nonNull).collect(Collectors.toList());
 
             // refresh TTL on channel set when listing
             try {
@@ -132,7 +132,7 @@ public class RedisSessionManager implements GenericSessionManager {
             SessionInfo si = cacheService.getSession(sessionId, SessionInfo.class);
             cacheService.remove(sessionId);
             if (si != null) {
-                String setKey = CacheKeys.CHANNEL_SESSIONS_PREFIX + si.getChannelId();
+                String setKey = cacheProperties.getChannelSessionsPrefix() + si.getChannelId();
                 redisTemplate.opsForSet().remove(setKey, sessionId);
             }
         } catch (Exception e) {

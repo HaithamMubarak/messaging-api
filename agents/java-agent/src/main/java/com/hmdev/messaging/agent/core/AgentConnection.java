@@ -65,6 +65,7 @@ public class AgentConnection {
      */
     public boolean connect(String channelName, String channelPassword, String agentName) throws Exception {
 
+        this.agentName = agentName;
         if (readyState && sessionId != null) {
             throw new Exception("Agent is " + agentName + " is already connected with session " + sessionId);
         }

@@ -39,8 +39,9 @@ public class RedisCacheServiceTest {
     @BeforeEach
     public void setup() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        CacheProperties props = new CacheProperties();
-        cacheService = new RedisCacheService(redisTemplate, objectMapper, props, true);
+        // CacheProperties is constructor-bound; pass nulls to use default values
+        CacheProperties props = new CacheProperties(null, null, null, null, null, null);
+        cacheService = new RedisCacheService(redisTemplate, objectMapper, props);
     }
 
     @Test
@@ -52,11 +53,11 @@ public class RedisCacheServiceTest {
         cacheService.putKafkaMessage(cacheKey, message);
 
         // verify set called with expected key and some JSON value and TTL
-        verify(valueOperations, times(1)).set(keyCaptor.capture(), valueCaptor.capture(), eq(Duration.ofSeconds(CacheKeys.KAFKA_MESSAGE_TTL_SECONDS)));
+        verify(valueOperations, times(1)).set(keyCaptor.capture(), valueCaptor.capture(), eq(Duration.ofSeconds(CacheProperties.DEFAULT_KAFKA_MESSAGE_TTL_SECONDS)));
         String usedKey = keyCaptor.getValue();
         String storedJson = valueCaptor.getValue();
 
-        assertEquals(CacheKeys.KAFKA_MSG_PREFIX + cacheKey, usedKey);
+        assertEquals(CacheProperties.DEFAULT_KAFKA_MSG_PREFIX + cacheKey, usedKey);
         assertNotNull(storedJson);
 
         // mock get to return the stored JSON and then read it back
@@ -72,7 +73,7 @@ public class RedisCacheServiceTest {
     @Test
     public void getSession_returnsNullWhenMissing() throws Exception {
         String sessionId = "nonexistent";
-        when(valueOperations.get(CacheKeys.SESSION_PREFIX + sessionId)).thenReturn(null);
+        when(valueOperations.get(CacheProperties.DEFAULT_SESSION_PREFIX + sessionId)).thenReturn(null);
 
         Object result = cacheService.getSession(sessionId, Object.class);
         assertNull(result);
