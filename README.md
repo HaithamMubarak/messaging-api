@@ -7,6 +7,24 @@ It supports **Web, Java, and Python agents** with **end-to-end encryption (AES-C
 
 ---
 
+## 🔒 Request Access to Production Repository
+
+> This repository showcases a **demo version** of the Messaging Platform project — a simplified public version for learning, exploration, and preview purposes.
+
+> **Note:** This is a **demo source code repository** intended for preview and educational use.  
+> The production version includes enhanced features, optimizations, and deployment-ready configurations.
+
+If you’re interested in exploring or collaborating on the production source:
+
+- 🧩 [**Open an Access Request Issue**](https://github.com/HaithamMubarak/messaging-api/issues/new?title=Request%20Access%20to%20Production%20Repository&body=Hi%20Haitham%2C%20I%27m%20interested%20in%20viewing%20the%20messaging-platform%20code.)  
+  _(This link opens a pre-filled GitHub issue for quick requests.)_
+
+- 📧 Or Reach me via [Email](mailto:haitham.mubarak.2015@gmail.com) with your GitHub username and a short note.
+
+I’m happy to grant **read access** to anyone genuinely interested in checking out the production version or learning more about the project.
+
+
+
 ## 🚀 Overview
 
 ### Core Idea
