@@ -1,4 +1,6 @@
-# Messaging API
+# Demo - Messaging API
+
+> **Production Repository:** [HaithamMubarak/messaging-platform](https://github.com/HaithamMubarak/messaging-platform)
 
 The **Messaging API** is a lightweight, agent-driven messaging platform enabling secure peer-to-peer communication through a relay service.  
 It supports **Web, Java, and Python agents** with **end-to-end encryption (AES-CTR)**.
@@ -65,6 +67,7 @@ See [THIRD_PARTY.md](./THIRD_PARTY.md) for license details.
 - [Services Guide](./services/README.md)  
 
 ---
+
 ## 🐳 Docker & Gradle Tasks
 
 ### Build Overview
@@ -118,52 +121,26 @@ docker run -d -p 8080:80 haithammubarak/messaging-api:origin-service
 ```bash
 mkdir -p ./data/origin-service/channels
 sudo chmod 777 ./data/origin-service/channels
-docker run -d -p 8080:80 \
-  --name origin-service \
-  -v $(pwd)/data/origin-service/channels:/var/www/html/messaging-api/origin-service/channels \
-  haithammubarak/messaging-api:origin-service
+docker run -d -p 8080:80   --name origin-service   -v $(pwd)/data/origin-service/channels:/var/www/html/messaging-api/origin-service/channels   haithammubarak/messaging-api:origin-service
 ```
 
-Origin Service → http://localhost:8080/messaging-api/origin-service
-
-Web Agent UI → http://localhost:8080/messaging-api/web-agent/index.html
+Origin Service → http://localhost:8080/messaging-api/origin-service  
+Web Agent UI → http://localhost:8080/messaging-api/web-agent/index.html  
 
 👉 Docker Hub: https://hub.docker.com/r/haithammubarak/messaging-api
+
+---
 
 ### Build Workflow (Origin Service + Web Agent)
 
 #### Option 1: Manual Setup (No Docker/Gradle)
 
 1. 🔗 Install **Apache + PHP** on your server (Linux recommended).  
-   Example (Debian/Ubuntu):
-   ```bash
-   sudo apt update
-   sudo apt install apache2 php libapache2-mod-php
-   ```
+2. Copy the **Origin Service PHP code** to your web root.  
+3. Copy the **Web Agent** files.  
+4. Create the channels directory.  
+5. Restart Apache.  
 
-2. Copy the **Origin Service PHP code** into your web root:
-   ```bash
-   sudo mkdir -p /var/www/html/messaging-api/origin-service/
-   sudo cp -r services/origin-service/* /var/www/html/messaging-api/origin-service/
-   ```
-
-3. Copy the **Web Agent** files:
-   ```bash
-   sudo mkdir -p /var/www/html/messaging-api/web-agent
-   sudo cp -r agents/web-agent/* /var/www/html/messaging-api/web-agent/
-   ```
-
-4. Create the channels directory:
-   ```bash
-   sudo mkdir -p /var/www/html/messaging-api/origin-service/channels
-   sudo chmod -R 775 /var/www/html/messaging-api/origin-service/channels
-   sudo chown -R www-data:www-data /var/www/html/messaging-api/origin-service/channels
-   ```
-
-5. Restart Apache:
-   ```bash
-   sudo systemctl restart apache2
-   ```
 ---
 
 #### 🔗 Option 2: Gradle/Docker Automation
@@ -172,109 +149,29 @@ Web Agent UI → http://localhost:8080/messaging-api/web-agent/index.html
    ```bash
    ./gradlew originServiceUp
    ```
-    - Builds the Docker image from `docker/Dockerfile.origin-service`.
-    - Launches a container named `origin-service`.
-    - Prepares the `channels` directory on the host and mounts it.
 
 2. **Open the Web Agent**
-    - Open `/messaging-api/web-agent/index.html` in your browser.
-    - Enter channel name, password, and nickname.
-    - Connect → messages are now relayed through the Origin Service.
+   - Open `/messaging-api/web-agent/index.html` in your browser.
+   - Enter channel name, password, and nickname.
+   - Connect → messages are now relayed through the Origin Service.
 
 ---
 
-### Other Tasks
-
-- **Build only**
-  ```bash
-  ./gradlew originServiceBuild
-  ```
-  Creates/updates the Docker image (`messaging-api:origin-service`) without running it.
-
-- **Run only**
-  ```bash
-  ./gradlew originServiceRun
-  ```
-  Starts the container from the existing image. Removes old instance if present.
-
-- **Stop**
-  ```bash
-  ./gradlew originServiceStop
-  ```
-  Stops and removes the container, leaving the image intact.
-
-
-### Example Workflow (Origin Service + Web Agent)
-
-1. **Build & Run the Origin Service**
-   ```bash
-   ./gradlew originServiceUp
-   ```
-    - Builds the Docker image from `docker/Dockerfile.origin-service`.
-    - Launches a container named `origin-service`.
-    - Prepares the `channels` directory on the host and mounts it.
-
-2. **Open the Web Agent**
-    - Open `/messaging-api/web-agent/index.html` in your browser.
-    - Enter channel name, password, and nickname.
-    - Connect → messages are now relayed through the Origin Service.
-
-### 🚀 Demo Access
+### 🧪 Demo Access
 
 #### 🔗 Origin Service (Relay API)
-The service endpoints are available at:
-- Local: **http://localhost/messaging-api/origin-service**
+- Local: **http://localhost/messaging-api/origin-service**  
 - Domain (Playground): **https://hmdevonline.com/messaging-api/origin-service**
 
----
-
-#### 💻 Web Agent UI (Browser Client)
-The Web Agent demo page is available at:
-- Local: **http://localhost/messaging-api/web-agent/index.html**
+#### 💻 Web Agent UI
+- Local: **http://localhost/messaging-api/web-agent/index.html**  
 - Domain (Playground): **https://hmdevonline.com/messaging-api/web-agent/index.html**
 
 ---
 
-### 🧪 How to Try It Out
+### 🧠 How to Try It Out
 
-1. **Choose a Channel**
-    - Channel Name (e.g., `system001`)
-    - Channel Password (e.g., `12345678`)
-    - These values are used by all agents to derive the same **channel secret key**.
-
-2. **Pick a Unique Agent Name**
-    - Each agent must use a **unique `agentName` / nickname** (e.g., `web-agent-001`, `python-bot`, `java-client1`).
-    - If two agents use the same name in the same channel, conflicts may occur.
-
-3. **Connect with the Web Agent**
-    - Open the Web Agent UI (link above).
-    - Enter **channel name**, **password**, and a unique **nickname**.
-    - Click **Connect** → the agent joins the channel.
-    - 👉 You can simulate multiple agents by:
-        - Opening two browser windows or tabs.
-        - Using different browsers.
-        - Opening an **incognito/private window**.
-        - Connecting from a **mobile device**.
-        - Connecting from **another machine** on the network.
-
-4. **Connect with the Python Agent**
-    - See [Python Agent README](./agents/python-agent/README.md).
-    - Example:
-      ```bash
-      cd agents/python-agent
-      python -m hmdev.messaging.agent.main --channel system001 --password 12345678 --agent-name python-agent-001
-      ```
-
-5. **Connect with the Java Agent**
-    - See [Java Agent README](./agents/java-agent/README.md).
-    - Example:
-      ```bash
-      ./gradlew :agents:java-agent:run --args="--channel system001 --password 12345678 --agent-name java-agent-001"
-      ```
-
-6. **Exchange Messages**
-    - Agents in the same channel can now exchange **end-to-end encrypted messages**.
-    - The Origin Service relays messages but **cannot decrypt them**.
+Follow the step-by-step example to connect agents (Web, Python, Java) and exchange encrypted messages using the same channel credentials.
 
 ---
 
@@ -287,11 +184,8 @@ The Web Agent demo page is available at:
 ---
 
 ## 🤝 Contributing
-
 Contributions are welcome! 🎉  
-Guidelines and contribution details will be published as the project grows.
-
-For now, feel free to explore the code, open issues, or share feedback to help shape the roadmap.
+Feel free to open issues or share feedback to help shape the roadmap.
 
 ---
 
