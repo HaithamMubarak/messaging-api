@@ -1,6 +1,8 @@
 # Demo - Messaging API
 
-> **Production Repository:** [HaithamMubarak/messaging-platform](https://github.com/HaithamMubarak/messaging-platform)
+
+> Note: the previous `origin-service` content has been moved to the branch `demo/origin-service-structure`.
+
 
 The **Messaging API** is a lightweight, agent-driven messaging platform enabling secure peer-to-peer communication through a relay service.  
 It supports **Web, Java, and Python agents** with **end-to-end encryption (AES-CTR)**.
@@ -9,7 +11,10 @@ It supports **Web, Java, and Python agents** with **end-to-end encryption (AES-C
 
 ## 🔒 Request Access to Production Repository
 
-> This repository showcases a **demo version** of the Messaging Platform project — a simplified public version for learning, exploration, and preview purposes.
+> **Production Repository:** [HaithamMubarak/messaging-platform](https://github.com/HaithamMubarak/messaging-platform)
+
+
+> The current repository showcases a **demo version** of the Messaging Platform project — a simplified public version for learning, exploration, and preview purposes.
 
 > **Note:** This is a **demo source code repository** intended for preview and educational use.  
 > The production version includes enhanced features, optimizations, and deployment-ready configurations.
@@ -28,185 +33,215 @@ I’m happy to grant **read access** to anyone genuinely interested in checking 
 ## 🚀 Overview
 
 ### Core Idea
-- Secure **agent-to-agent** messaging.  
-- Server acts only as a **relay** (no decryption).  
-- Encryption key derived from **channelName + channelPassword**.
+- Secure agent-to-agent messaging.
+- The server is a stateless relay (no decryption of payloads).
+- Encryption key derived from `channelName + channelPassword`.
 
-### Supported Agents
-- 🌐 Web Agent  
-- ☕ Java Agent  
-- 🐍 Python Agent  
-
-### Current Status
-- ✅ Working prototype with **Origin Service**.  
-- ✅ Agents implemented (Web, Java, Python).  
-- ⚙️ Future: **Kafka backend** & WebSocket support.  
+### Components
+- Web Agent (browser UI) — `agents/web-agent`
+- Java Agent (library + example app) — `agents/java-agent`
+- Python Agent (package + example script) — `agents/python-agent`
+- Messaging Service (Java/Spring Boot relay) — `services/messaging-service`
 
 ---
 
-## 🏗 Architecture
-
-### Services
-- **Origin Service** → PHP relay (current).  
-- **Kafka Service** → planned scalable backend.  
-
-### Flow
-```
-[ Agent A ] <-- encrypted --> [ Messaging API Relay ] <-- encrypted --> [ Agent B ]
-```
+## 📚 Documentation
+- Communication Algorithm → `docs/communication-algorithm.md`
+- Request/Response Examples → `docs/examples.md`
+- Agents Guide → `agents/README.md`
+- Services Guide → `services/README.md`
+- Docker / local dev compose → `docker/README.md`
 
 ---
 
-## 🔐 Security Model
+## ⚡ Quick Start (developer)
 
-- **End-to-End Encryption** → Messages are encrypted with AES-CTR using a key derived from `(channelName + channelPassword)`.
-- **Integrity Protection** → Each message includes a SHA-256 hash to verify data integrity.
-- **Zero Knowledge Relay** → The server only relays events and never has access to plaintext message content.
-- **Transport Security** → HTTPS is used to secure communication between agents and the relay.
-- **Future Option** → In environments without HTTPS, an API option will be introduced to support public/private relay servers with enhanced key handling.
+[![Latest tag](https://img.shields.io/docker/v/haithammubarak/messaging-platform?label=latest&logo=docker)](https://hub.docker.com/repository/docker/haithammubarak/messaging-platform/tags/messaging-service)
 
----
+Docker image: [haithammubarak/messaging-platform:messaging-service](https://hub.docker.com/repository/docker/haithammubarak/messaging-platform/tags/messaging-service)
 
-## 📦 Dependencies
-- [JSEncrypt v2.3.1](https://github.com/travist/jsencrypt) → RSA key encryption.  
-- [Video.js](https://videojs.com/) + [videojs-contrib-hls](https://github.com/videojs/videojs-contrib-hls) → adaptive streaming.  
-- AES JavaScript libraries (AES-CTR, AES.js, Base64.js) → symmetric encryption helpers.  
-- [Emojify.js](https://github.com/Ranks/emojify.js) → emoji rendering.  
+1) Docker Compose (recommended)
 
-See [THIRD_PARTY.md](./THIRD_PARTY.md) for license details.
+Windows (cmd.exe):
 
----
-
-## 📖 Documentation
-
-- [Communication Algorithm](./docs/communication-algorithm.md)  
-- [Service Requests & Responses](./docs/examples.md)  
-- [Agents Guide](./agents/README.md)  
-- [Services Guide](./services/README.md)  
-
----
-
-## 🐳 Docker & Gradle Tasks
-
-### Build Overview
-The project uses **Gradle tasks** to simplify container management.  
-This avoids typing long `docker build` / `docker run` commands and ensures a repeatable environment for running the **Origin Service**.
-
-Currently, automation is provided for the **Origin Service** (the relay server).  
-Once the container is running, agents such as the **Web Agent** can connect and start exchanging encrypted messages.
-
----
-
-### 🔹 Origin Service
-
-The **Origin Service Docker image** is built from `docker/Dockerfile.origin-service`.  
-It is based on a lightweight **Apache + PHP** environment and contains:
-
-- **Messaging API Origin Service PHP code** → `/var/www/html/messaging-api/origin-service`
-- **Channels directory** → mounted volume for storing channel/session data:
-  ```
-  /root/data/messaging-api/origin-service/channels
-  ```
-  This directory is created on the host during container startup and mounted into the container.
-- **API endpoints** served via Apache:
-    - `/origin-service?action=connect`
-    - `/origin-service?action=active-agents`
-    - `/origin-service?action=receive`
-    - `/origin-service?action=event`
-    - `/origin-service?action=disconnect`
-
-The server acts only as a **relay**. It cannot decrypt messages (end-to-end encryption is enforced between agents).
-
-Once running, the service will be available at:  
-**http://localhost:8080/messaging-api/origin-service**
-
-Web-Agent page will be available at:  
-**http://localhost:8080/messaging-api/web-agent/index.html**
-
----
-
-### 🚀 Run Using Prebuilt Docker Image
-
-You can quickly start the Origin Service using the prebuilt Docker image from Docker Hub.
-
-#### Simple run (no persistence)
-```bash
-docker pull haithammubarak/messaging-api:origin-service
-docker run -d -p 8080:80 haithammubarak/messaging-api:origin-service
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose up --build
 ```
 
-#### Run with mounted folder (persistent channels)
-```bash
-mkdir -p ./data/origin-service/channels
-sudo chmod 777 ./data/origin-service/channels
-docker run -d -p 8080:80   --name origin-service   -v $(pwd)/data/origin-service/channels:/var/www/html/messaging-api/origin-service/channels   haithammubarak/messaging-api:origin-service
+POSIX (bash/zsh):
+
+```sh
+cd /path/to/messaging-platform/docker
+docker compose up --build
 ```
 
-Origin Service → http://localhost:8080/messaging-api/origin-service  
-Web Agent UI → http://localhost:8080/messaging-api/web-agent/index.html  
+Note: a pre-built messaging service image is published on Docker Hub: `haithammubarak/messaging-platform:messaging-service` ([haithammubarak/messaging-platform:messaging-service](https://hub.docker.com/repository/docker/haithammubarak/messaging-platform/tags/messaging-service)). You can pull that image instead of building locally — see the Docker section below for details and examples.  
 
-👉 Docker Hub: https://hub.docker.com/r/haithammubarak/messaging-api
+2) Alternative — Run the Messaging Service locally (Windows CMD)
 
----
+```bat
+cd /d C:\Users\admin\dev\messaging-platform
+gradlew.bat :services:messaging-service:bootRun
+```
 
-### Build Workflow (Origin Service + Web Agent)
+Then open the Web Agent:
+- http://localhost:8080/messaging-platform/web-agent/index.html
 
-#### Option 1: Manual Setup (No Docker/Gradle)
+3) Java Agent Example (from repo root)
 
-1. 🔗 Install **Apache + PHP** on your server (Linux recommended).  
-2. Copy the **Origin Service PHP code** to your web root.  
-3. Copy the **Web Agent** files.  
-4. Create the channels directory.  
-5. Restart Apache.  
+```bat
+gradlew.bat :agents:examples:java-agent-chat:run --args="--channel system001 --password 12345678 --agent-name java-agent-example-001"
+```
 
----
+4) Python Agent Example (from example folder)
 
-#### 🔗 Option 2: Gradle/Docker Automation
-
-1. **Build & Run the Origin Service**
-   ```bash
-   ./gradlew originServiceUp
-   ```
-
-2. **Open the Web Agent**
-   - Open `/messaging-api/web-agent/index.html` in your browser.
-   - Enter channel name, password, and nickname.
-   - Connect → messages are now relayed through the Origin Service.
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\agents\examples\python-agent-chat
+python chat_example.py --url http://localhost:8082/messaging-platform/api/v1/messaging-service --channel system001 --password 12345678 --agent-name python-agent-example-001
+```
 
 ---
 
-### 🧪 Demo Access
+## 🛠 Main commands
 
-#### 🔗 Origin Service (Relay API)
-- Local: **http://localhost/messaging-api/origin-service**  
-- Domain (Playground): **https://hmdevonline.com/messaging-api/origin-service**
+Below are the canonical copy/paste commands for starting and stopping the stack. Helper scripts have been removed — use these Docker Compose and Gradle commands directly.
 
-#### 💻 Web Agent UI
-- Local: **http://localhost/messaging-api/web-agent/index.html**  
-- Domain (Playground): **https://hmdevonline.com/messaging-api/web-agent/index.html**
+A) Repo (default) compose — build images from local sources
 
----
+Windows (cmd.exe):
 
-### 🧠 How to Try It Out
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose up --build -d
+```
 
-Follow the step-by-step example to connect agents (Web, Python, Java) and exchange encrypted messages using the same channel credentials.
+POSIX:
 
----
+```sh
+cd /path/to/messaging-platform/docker
+docker compose up --build -d
+```
 
-## 🔮 Roadmap
-- WebSocket support.  
-- Kafka backend integration.  
-- Metadata exchange via AgentContext.  
-- Docker Compose for full system.  
+Start only core services and build:
 
----
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose up -d --build redis kafka postgres messaging-service
+```
 
-## 🤝 Contributing
-Contributions are welcome! 🎉  
-Feel free to open issues or share feedback to help shape the roadmap.
+Stop and remove containers + volumes (repo compose):
 
----
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose down -v
+```
 
-## 📜 Project History
-Originally started in **2017** as [Quick Chrome Share Tool](https://bitbucket.org/haithammubarak/quick_chrome_share/src/master/chrome-quick-share-tool/).  
-Migrated and restructured in **2025** as **Messaging API**.
+B) Hub-image compose — use published messaging-service image (no local build)
+
+This repository includes `docker/docker-compose.hub.yml` which is a self-contained compose file (redis, kafka, postgres, messaging-service) that references the published image `haithammubarak/messaging-platform:messaging-service`.
+
+Start (pull published image, do not build local images):
+
+Windows (detached):
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose -f docker-compose.hub.yml up -d --pull --no-build
+```
+
+POSIX (detached):
+
+```sh
+cd /path/to/messaging-platform/docker
+docker compose -f docker-compose.hub.yml up -d --pull --no-build
+```
+
+Foreground (logs):
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose -f docker-compose.hub.yml up --pull --no-build
+```
+
+Stop and remove containers + volumes (hub compose):
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose -f docker-compose.hub.yml down -v
+```
+
+C) Gradle convenience task (repository-local compose)
+
+The root `build.gradle` defines a convenience task `messagingServiceUp` which builds the `services:messaging-service` artifact and brings up a Docker Compose stack.
+
+Run (default — build + repo compose):
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform
+gradlew.bat messagingServiceUp
+```
+
+Behavior details
+- The Gradle helper task builds the `services:messaging-service` JAR (dependency) and runs `docker compose -f docker/docker-compose.yml up --build -d`.
+
+Notes
+- The Gradle helper no longer supports selecting the hub compose file; it always uses the repository `docker/docker-compose.yml`.
+
+Companion task
+- `messagingServiceDown` is available to stop and remove the compose stack and volumes (it uses the same compose file selection as `messagingServiceUp`).
+
+Where it's defined
+- File: `build.gradle` at the repository root (top-level project). Search for `tasks.register('messagingServiceUp'`).
+
+## Docker (recommended)
+
+This project ships with two compose files in `docker/`:
+- `docker/docker-compose.yml` — the default compose file that builds local images from source.
+- `docker/docker-compose.hub.yml` — an alternate compose file that references a published messaging-service image on Docker Hub.
+
+When to use which
+- Develop locally or make code changes: use the default repo compose (`docker/docker-compose.yml`). It builds the `messaging-service` image from the local source tree.
+- Quick start or CI where you don't need to build locally: use the hub compose (`docker/docker-compose.hub.yml`) which pulls the published image `haithammubarak/messaging-platform:messaging-service` ([haithammubarak/messaging-platform:messaging-service](https://hub.docker.com/repository/docker/haithammubarak/messaging-platform/tags/messaging-service)).
+
+Using the published Docker Hub image (no Gradle)
+
+If you prefer to run docker compose directly and use the published messaging-service image (no build):
+
+Windows (cmd.exe):
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose -f docker-compose.hub.yml up -d --pull --no-build
+```
+
+To run in the foreground and stream logs:
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose -f docker-compose.hub.yml up --pull --no-build
+```
+
+Stop and remove containers + volumes:
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform\docker
+docker compose -f docker-compose.hub.yml down -v
+```
+
+Notes about the published image
+- Image name: `haithammubarak/messaging-platform:messaging-service`.
+- The published image contains the built `messaging-service` JAR and is maintained by the project owner.
+- Using the hub image is faster for demos and CI, but you won't be testing local code changes to the `services/messaging-service` module.
+
+Troubleshooting tips
+- If ports are already in use, stop conflicting services or change the ports in `docker/docker-compose.yml`.
+- On Windows, ensure Docker Desktop is running and that WSL2 integration or Hyper-V is configured (depending on your Docker setup).
+- If you make changes to the Java service and want to run them via Gradle helper, run:
+
+```bat
+cd /d C:\Users\admin\dev\messaging-platform
+gradlew.bat messagingServiceUp
+```
+
+This will build the JAR and bring up the repo compose stack.

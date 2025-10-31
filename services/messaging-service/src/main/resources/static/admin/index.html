@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Messaging Service — Admin</title>
+  <style>
+    body{font-family:Inter,Arial,Helvetica,sans-serif;margin:16px;background:#f7f9fc;color:#172b4d}
+    h1{font-size:20px;margin-bottom:8px}
+    .row{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+    .card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    .col{flex:1}
+    input,select,button,textarea{padding:8px;border:1px solid #e6eef8;border-radius:6px}
+    button{background:#0b69ff;color:#fff;border:none;cursor:pointer;padding:8px 10px;border-radius:6px}
+    button.ghost{background:transparent;color:#0b69ff;border:1px solid #dcefff}
+    button.danger{background:#ef4444}
+    pre{background:#0f1724;color:#e6eef8;padding:8px;border-radius:6px;overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}
+    .small{font-size:12px;color:#6b7280}
+    .muted{color:#6b7280}
+    .controls{display:flex;gap:8px;align-items:center}
+    .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:16px;border-radius:10px;box-shadow:0 12px 48px rgba(2,6,23,0.2);display:none;z-index:999;width:720px;max-width:95%}
+    .modal.show{display:block}
+    .overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45);display:none}
+    .overlay.show{display:block}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .modal-title{font-weight:600}
+    .modal-actions{display:flex;gap:8px}
+    .sseMsg{padding:6px;border-bottom:1px solid #eef2f7}
+    .pager{display:flex;gap:8px;align-items:center}
+    .export-btn{background:#10b981}
+    a.chanLink{display:block;padding:6px;border-bottom:1px solid #eef2f7;color:#0b69ff;text-decoration:none}
+    a.chanLink:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+  <h1>Messaging Service — Admin Console</h1>
+
+  <div class="card row">
+    <div class="col">
+      <label class="small">Admin Token (X-Admin-Token)</label><br>
+      <input id="adminToken" aria-label="Admin token" placeholder="paste admin token if used" style="width:100%" />
+    </div>
+    <div style="width:260px">
+      <label class="small">Admin Basic Auth</label><br>
+      <input id="adminUser" aria-label="Admin username" placeholder="username" style="width:49%" />
+      <input id="adminPass" aria-label="Admin password" placeholder="password" type="password" style="width:49%" />
+    </div>
+    <div style="flex:1;max-width:800px">
+      <label class="small">Channel id</label><br>
+      <input id="channelId" aria-label="Channel id" placeholder="channel id" style="width:60%;display:inline-block" />
+      <button id="listChannelsBtn" style="width:14%;display:inline-block;margin-left:6px">List Channels</button>
+      <select id="sourceSelect" style="width:20%;display:inline-block;margin-left:6px">
+        <option value="cache">Cache</option>
+        <option value="runtime">Runtime (Kafka)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <div class="row">
+      <div class="col">
+        <strong>Channels</strong>
+        <div id="channelsContainer" class="muted small" style="margin-top:6px">Use "List Channels" to load channels</div>
+      </div>
+      <div style="width:420px">
+        <div class="controls">
+          <button id="refreshChannelBtn">Refresh Selected</button>
+          <!-- View Messages now sits in messages control area but keep a button here for legacy users (hidden) -->
+          <!-- removed duplicate List Channels from here -->
+          <button id="connectStreamBtn">Connect Stream</button>
+          <button id="disconnectStreamBtn" disabled>Disconnect Stream</button>
+          <label class="small" style="margin-left:8px"><input type="checkbox" id="liveAgentsChk"/> Live agents</label>
+        </div>
+      </div>
+      <div style="width:340px">
+        <div class="controls">
+          <label><input type="checkbox" id="deleteTopicCb"/> Delete topic</label>
+          <button id="removeChannelBtn" class="danger">Remove Channel</button>
+          <button id="resetCounterBtn">Reset Counter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Channel Details</h3>
+    <div id="channelDetails" class="small muted">No channel selected</div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Messages (cached) <span id="sourceIndicator" class="small muted" style="margin-left:8px">Source: cache</span></h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <div class="pager">
+        <label class="small">Page</label>
+        <button id="prevMsgsBtn" class="ghost">Prev</button>
+        <div id="pageInfo" class="small muted">1 / 1</div>
+        <button id="nextMsgsBtn" class="ghost">Next</button>
+      </div>
+      <label class="small">Page size</label>
+      <select id="msgLimit" aria-label="Messages per page" style="width:90px"><option>10</option><option selected>50</option><option>100</option><option>200</option></select>
+      <label class="small">Jump to page</label>
+      <input id="jumpPage" aria-label="Jump to page" style="width:80px" placeholder="page#" />
+      <button id="jumpBtn" class="ghost">Go</button>
+      <div style="flex:1"></div>
+      <!-- View Messages moved here next to export -->
+      <button id="viewMessagesBtn" class="ghost">View Messages</button>
+      <button id="exportMessagesBtn" class="export-btn">Export Messages (CSV)</button>
+    </div>
+    <div id="messagesContainer" style="max-height:320px;overflow:auto" class="small muted">No messages</div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Live Stream</h3>
+    <div class="small muted">Use stream to get recent messages (SSE)</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <label class="small">Poll ms</label><input id="streamPollMs" aria-label="Stream poll milliseconds" value="1000" style="width:80px"/>
+      <label class="small">Auto-scroll</label><input type="checkbox" id="autoScroll" aria-label="Auto-scroll live stream" checked/>
+    </div>
+    <div id="liveContainer" style="max-height:240px;overflow:auto;margin-top:8px;border-top:1px solid #eef2f7"></div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Connected Agents</h3>
+    <table id="agentsTable"><thead><tr><th>Agent</th><th>SessionId</th><th>LastSeen</th><th>LastRead</th><th>Actions</th></tr></thead><tbody><tr><td colspan="5" class="muted">No agents</td></tr></tbody></table>
+
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <input id="agentNameToDisconnect" placeholder="agent name to disconnect" style="width:240px;padding:6px;border:1px solid #e6eef8;border-radius:6px" />
+      <button id="disconnectByNameBtn" class="ghost">Disconnect by Name</button>
+      <div style="flex:1"></div>
+      <label class="small muted">Tip: Use session buttons to disconnect a specific session.</label>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Audit (last entries)</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input id="auditLimit" aria-label="Audit entries limit" value="50" style="width:80px"/>
+      <button id="loadAuditBtn">Load</button>
+      <div style="flex:1"></div>
+      <button id="exportAuditBtn" class="ghost">Export Audit</button>
+    </div>
+    <pre id="auditContainer" style="height:160px">-- audit log --</pre>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Details</div>
+      <div class="modal-actions">
+        <button id="modalCopy" class="ghost">Copy</button>
+        <button id="modalClose" class="ghost">Close</button>
+      </div>
+    </div>
+    <pre id="modalBody" style="max-height:360px;overflow:auto"></pre>
+  </div>
+
+  <script>
+    const base = '/messaging-platform/api/v1/messaging-service/admin';
+    let currentSse = null;
+    let lastMessages = []; // store last fetched messages for export and paging
+    let lastMessagesMeta = {offset:0, limit:50, total:0};
+
+    // Safe helper: many pages expect window.getApiResponse(ev) to extract the API payload from an event-like object.
+    // Provide a tolerant implementation so included libraries/pages don't fail if they call it.
+    window.getApiResponse = function(ev) {
+      try {
+        if (!ev) return null;
+        // If ev is already a JSON response object
+        if (ev.status && (ev.data !== undefined || ev.statusMessage !== undefined)) return ev;
+        // If ev has a .response property (some event dispatchers use this)
+        if (ev.response && (ev.response.status || ev.response.data !== undefined)) return ev.response;
+        // If ev has a .detail property (CustomEvent)
+        if (ev.detail && (ev.detail.status || ev.detail.data !== undefined)) return ev.detail;
+        // fallback: return ev itself
+        return ev;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    function getHeaders() {
+      const headers = {'Content-Type':'application/json'};
+      const token = document.getElementById('adminToken').value.trim();
+      if (token) headers['X-Admin-Token'] = token;
+
+      const user = document.getElementById('adminUser').value.trim();
+      const pass = document.getElementById('adminPass').value;
+      if (user) {
+        const pair = user + ':' + (pass || '');
+        const encoded = btoa(pair);
+        headers['Authorization'] = 'Basic ' + encoded;
+      }
+      return headers;
+    }
+
+    // Response helpers: older code assumed `json.success`; server uses {status, statusMessage, data}
+    function isSuccess(json){ return json && json.status === 'success'; }
+    function getErrorMessage(json){ return (json && json.statusMessage) || (json && json.error) || 'Unknown error'; }
+    function getData(json){ return json && json.data; }
+
+    function showModal(title, body) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').textContent = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+      document.getElementById('overlay').classList.add('show');
+      document.getElementById('modal').classList.add('show');
+    }
+    function hideModal(){ document.getElementById('overlay').classList.remove('show'); document.getElementById('modal').classList.remove('show'); }
+
+    document.getElementById('modalClose').addEventListener('click', hideModal);
+    document.getElementById('overlay').addEventListener('click', hideModal);
+    document.getElementById('modalCopy').addEventListener('click', () => {
+      const txt = document.getElementById('modalBody').textContent || '';
+      try { navigator.clipboard.writeText(txt); alert('Copied to clipboard'); } catch (e) { prompt('Copy content', txt); }
+    });
+
+    async function listChannels() {
+      const headers = getHeaders();
+      const res = await fetch(base + '/channels', {headers});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      let list = getData(json);
+      // Defensive normalization: ensure list is always a true array (handles arrays, objects/maps, or null)
+      if (Array.isArray(list)) {
+        // ok
+      } else if (list && typeof list === 'object') {
+        list = Object.values(list);
+      } else {
+        list = [];
+      }
+      const container = document.getElementById('channelsContainer');
+      if (!list.length) { container.innerHTML = '<div class="muted">No channels</div>'; return; }
+      // Make each channel id clickable to auto-select
+      const rows = list.map(c => `<a href="#" class="chanLink" onclick="selectChannel('${(c.channelId+'').replace(/'/g,"\\'")}')"><strong>${c.channelId}</strong> <span class=\"small muted\">events: ${c.eventCount}</span></a>`);
+      container.innerHTML = rows.join('');
+      // auto-select first
+      document.getElementById('channelId').value = list[0].channelId;
+      await refreshSelected();
+    }
+
+    // helper to pick a channel from the list
+    function selectChannel(id){ document.getElementById('channelId').value = id; refreshSelected(); }
+
+    // refresh channel and populate agents table including fetching session detail to show times
+    async function refreshSelected() {
+      const cid = document.getElementById('channelId').value.trim();
+      if (!cid) return;
+      const headers = getHeaders();
+      const res = await fetch(base + '/channels/' + encodeURIComponent(cid), {headers});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      const d = getData(json) || {};
+      document.getElementById('channelDetails').innerHTML = `<div><strong>${d.channelId}</strong> - events: ${d.eventCount}</div><div class="small">agents: ${d.connectedAgents ? d.connectedAgents.length : 0}</div>`;
+      const tbody = document.querySelector('#agentsTable tbody');
+      tbody.innerHTML = '';
+      if (!d.connectedAgents || d.connectedAgents.length===0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">No agents</td></tr>';
+      } else {
+        for (const a of d.connectedAgents) {
+          const tr = document.createElement('tr');
+          // Make the agent name clickable; clicking populates the "agentNameToDisconnect" input for convenience.
+          const safeAgentName = (a.agentName || '').replace(/'/g, "\\'");
+          tr.innerHTML = `<td><a href="#" onclick="document.getElementById('agentNameToDisconnect').value='${safeAgentName}';return false;">${a.agentName || ''}</a></td><td>${a.sessionId}</td><td class="small muted">Loading...</td><td class="small muted">-</td><td><button onclick="viewAgentDetails('${a.sessionId.replace(/'/g,"\\'")}')">Details</button> <button onclick="disconnectAgentBySession('${a.sessionId.replace(/'/g,"\\'")}')">Disconnect</button></td>`;
+          tbody.appendChild(tr);
+          // fetch session detail to show LastSeen/LastRead
+          (async (sid, row) => {
+            try {
+              const resp = await fetch(base + '/channels/' + encodeURIComponent(cid) + '/agents/' + encodeURIComponent(sid), {headers});
+              const j = await resp.json();
+              if (!isSuccess(j)) return;
+              const si = getData(j);
+              const cells = row.querySelectorAll('td');
+              function fmt(ts) { return ts ? new Date(ts).toLocaleString() : '-'; }
+              cells[2].textContent = fmt(si.lastSeenTime);
+              cells[3].textContent = fmt(si.lastReadTime);
+            } catch (e) { console.warn(e); }
+          })(a.sessionId, tr);
+        }
+      }
+    }
+
+    // paging helpers
+    function updatePageInfo(offset, limit, total) {
+      const page = Math.floor(offset / limit) + 1;
+      const pages = Math.max(1, Math.ceil(total / limit));
+      document.getElementById('pageInfo').textContent = page + ' / ' + pages;
+    }
+
+    function getSource() {
+      const s = document.getElementById('sourceSelect');
+      return s ? s.value : 'cache';
+    }
+
+    // Update source indicator visually
+    function updateSourceIndicator() {
+      const el = document.getElementById('sourceIndicator');
+      if (el) el.textContent = 'Source: ' + getSource();
+    }
+
+    async function viewMessages(offset=null) {
+      const cid = document.getElementById('channelId').value.trim();
+      if (!cid) return alert('Set channel id');
+      const limit = parseInt(document.getElementById('msgLimit').value || '50',10);
+      const off = offset !== null ? offset : (parseInt(lastMessagesMeta.offset||0,10) || 0);
+      const headers = getHeaders();
+      const source = getSource();
+      const res = await fetch(base + '/channels/' + encodeURIComponent(cid) + '/messages?offset=' + off + '&limit=' + limit + '&source=' + encodeURIComponent(source), {headers});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      const data = getData(json) || {};
+
+      // Normalize messages to an array to avoid "list.map is not a function"
+      let msgs = [];
+      if (Array.isArray(data.messages)) {
+        msgs = data.messages;
+      } else if (data && typeof data.messages === 'object' && data.messages !== null) {
+        msgs = Object.values(data.messages);
+      } else if (data && data.messages != null) {
+        msgs = [data.messages];
+      }
+
+      const total = data.total || 0;
+      lastMessages = msgs;
+      lastMessagesMeta = {offset: off, limit: limit, total: total};
+      updatePageInfo(off, limit, total);
+      const container = document.getElementById('messagesContainer');
+      if (!msgs.length) { container.innerHTML = '<div class="muted">No cached messages</div>'; return; }
+      // Group messages by day and sender for readability
+      const fragments = [];
+      let lastDay = null;
+      let lastFrom = null;
+      for (let i = 0; i < msgs.length; i++) {
+        const m = msgs[i];
+        const timestamp = m.date ? new Date(m.date) : new Date();
+        const day = timestamp.toDateString();
+        if (day !== lastDay) {
+          fragments.push(`<div style="text-align:center;margin:12px 0;color:#6b7280;font-size:12px">${timestamp.toLocaleDateString()}</div>`);
+          lastDay = day;
+          lastFrom = null;
+        }
+
+        const content = (typeof m.msg === 'string' && m.msg) || (typeof m.content === 'string' && m.content) || (m.content && typeof m.content === 'object' ? JSON.stringify(m.content) : '') || '';
+        const enc = m.encrypted ? '🔒 ' : '';
+        const from = m.from || '';
+        const time = timestamp.toLocaleTimeString();
+
+        if (from === lastFrom) {
+          // same group: append content
+          fragments.push(`<div style="padding:8px 12px 8px 48px;border-bottom:1px solid #eef2f7"><div class="small">${enc}${content} <span class="small muted">${time}</span></div><div style="margin-top:6px"><button class="ghost" onclick="showMessageDetails(${i})">Details</button></div></div>`);
+        } else {
+          // new group with header
+          fragments.push(`<div style="padding:8px;border-bottom:1px solid #eef2f7;display:flex;gap:12px"><div style="width:40px;height:40px;border-radius:8px;background:#eef2f7;color:#0b1220;display:flex;align-items:center;justify-content:center;font-weight:700">${String(from||'U').charAt(0)}</div><div style="flex:1"><div><strong>${from}</strong> <span class="small muted">@ ${time}</span></div><div class="small">${enc}${content}</div><div style="margin-top:6px"><button class="ghost" onclick="showMessageDetails(${i})">Details</button></div></div></div>`);
+          lastFrom = from;
+        }
+      }
+      container.innerHTML = fragments.join('');
+    }
+
+    // show pretty JSON for a loaded message
+    function showMessageDetails(index) {
+      const msg = lastMessages && lastMessages[index];
+      if (!msg) return alert('Message not found');
+      // Attempt to pretty-render content if JSON
+      try {
+        showModal('Message details', msg);
+      } catch (e) {
+        showModal('Message details', JSON.stringify(msg, null, 2));
+      }
+    }
+
+    document.getElementById('prevMsgsBtn').addEventListener('click', async ()=>{
+      const off = Math.max(0, (lastMessagesMeta.offset || 0) - (lastMessagesMeta.limit || parseInt(document.getElementById('msgLimit').value)));
+      await viewMessages(off);
+    });
+    document.getElementById('nextMsgsBtn').addEventListener('click', async ()=>{
+      const off = (lastMessagesMeta.offset || 0) + (lastMessagesMeta.limit || parseInt(document.getElementById('msgLimit').value));
+      await viewMessages(off);
+    });
+    document.getElementById('jumpBtn').addEventListener('click', async ()=>{
+      const page = parseInt(document.getElementById('jumpPage').value||'1',10);
+      const limit = parseInt(document.getElementById('msgLimit').value||'50',10);
+      const off = Math.max(0, (page-1) * limit);
+      await viewMessages(off);
+    });
+
+    async function viewAgentDetails(sessionId) {
+      const cid = document.getElementById('channelId').value.trim();
+      if (!cid) return alert('Set channel id');
+      const headers = getHeaders();
+      const res = await fetch(base + '/channels/' + encodeURIComponent(cid) + '/agents/' + encodeURIComponent(sessionId), {headers});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      showModal('Session: ' + sessionId, getData(json));
+    }
+
+    async function disconnectAgentBySession(sessionId) {
+      const cid = document.getElementById('channelId').value.trim();
+      if (!cid) return alert('Set channel id');
+      if (!confirm('Disconnect session ' + sessionId + ' from channel ' + cid + '?')) return;
+      const headers = getHeaders();
+      const body = { sessionId };
+      const res = await fetch(base + '/channels/' + encodeURIComponent(cid) + '/disconnect-agent', {method:'POST', headers, body: JSON.stringify(body)});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      alert('Disconnected: ' + JSON.stringify(getData(json).removed || getData(json)));
+      await refreshSelected();
+    }
+
+    async function removeChannel() {
+      const cid = document.getElementById('channelId').value.trim();
+      const deleteTopic = document.getElementById('deleteTopicCb').checked;
+      if (!cid) return alert('Provide channelId');
+
+      let confirmMsg = 'This will remove all cache entries for the channel and disconnect sessions.';
+      if (deleteTopic) confirmMsg += '\nAlso attempt to delete the Kafka topic (may fail).';
+      if (!confirm(confirmMsg)) return;
+
+      const body = {channelId: cid, deleteTopic: deleteTopic};
+      const headers = getHeaders();
+      const res = await fetch(base + '/remove', {method:'POST', headers, body: JSON.stringify(body)});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      const d = getData(json) || {};
+      alert('Removed channel: ' + (d.channelId || cid) + (d.topicDeleteError ? '\nTopic delete error: ' + d.topicDeleteError : ''));
+      await listChannels();
+    }
+
+    async function resetCounter() {
+      const cid = document.getElementById('channelId').value.trim();
+      if (!cid) return alert('Set channel id');
+      const headers = getHeaders();
+      const res = await fetch(base + '/reset-counter', {method:'POST', headers, body: JSON.stringify({channelId: cid})});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      alert('Counter reset for ' + cid);
+    }
+
+    async function loadAudit() {
+      const limit = document.getElementById('auditLimit').value || 50;
+      const headers = getHeaders();
+      const res = await fetch(base + '/audit?limit=' + encodeURIComponent(limit), {headers});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      document.getElementById('auditContainer').textContent = (getData(json) || []).join('\n');
+    }
+
+    // Export utilities
+    function download(filename, content, mime='text/csv'){
+      const blob = new Blob([content], {type: mime + ';charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    function toCsv(rows, headers) {
+      const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
+      const line = arr => arr.map(esc).join(',');
+      const all = [line(headers)].concat(rows.map(r => line(headers.map(h => r[h]))));
+      return all.join('\n');
+    }
+
+    document.getElementById('exportMessagesBtn').addEventListener('click', ()=>{
+      if (!lastMessages || !lastMessages.length) return alert('No messages loaded');
+      const rows = lastMessages.map(m => ({from:m.from,to:m.to,date:m.date,type:m.type || '',encrypted: m.encrypted === true,content: (typeof m.content === 'string' ? m.content : JSON.stringify(m.content || m)),localOffset: m.otherProperties && m.otherProperties.localOffset ? m.otherProperties.localOffset : (m.otherProperties && m.otherProperties.localOffset === 0 ? 0 : '')}));
+      const csv = toCsv(rows, ['from','to','date','type','encrypted','localOffset','content']);
+      download('messages.csv', csv, 'text/csv');
+    });
+
+    document.getElementById('exportAuditBtn').addEventListener('click', async ()=>{
+      const limit = document.getElementById('auditLimit').value || 500;
+      const headers = getHeaders();
+      const res = await fetch(base + '/audit?limit=' + encodeURIComponent(limit), {headers});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed to load audit');
+      const text = (getData(json) || []).join('\n');
+      download('admin-audit.log', text, 'text/plain');
+    });
+
+    // SSE stream handling
+    function appendLiveMessage(m) {
+      const c = document.getElementById('liveContainer');
+      const div = document.createElement('div');
+      div.className = 'sseMsg';
+      const display = (m.msg || m.content || (m.otherProperties ? JSON.stringify(m.otherProperties) : ''));
+      div.textContent = `${m.from || ''} → ${m.to || ''} @ ${new Date(m.date).toLocaleString()} : ${typeof display === 'string' ? display : JSON.stringify(display)}`;
+      c.appendChild(div);
+      if (document.getElementById('autoScroll').checked) c.scrollTop = c.scrollHeight;
+    }
+
+    function connectStream() {
+      const cid = document.getElementById('channelId').value.trim();
+      if (!cid) return alert('Set channel id');
+      if currentSse) currentSse.close();
+      const poll = parseInt(document.getElementById('streamPollMs').value || '1000',10);
+      const token = document.getElementById('adminToken').value.trim();
+      const source = getSource();
+      const q = '?pollMs=' + encodeURIComponent(poll) + '&source=' + encodeURIComponent(source) + (token ? '&token=' + encodeURIComponent(token) : '');
+      const url = base + '/channels/' + encodeURIComponent(cid) + '/stream' + q;
+      try { currentSse = new EventSource(url); } catch (e) { alert('SSE not supported: ' + e.message); return; }
+      currentSse.onmessage = function(evt){ try { const data = JSON.parse(evt.data); appendLiveMessage(data); } catch (e) { console.warn(e); } };
+      currentSse.onerror = function(evt){ console.warn('SSE error', evt); };
+      document.getElementById('connectStreamBtn').disabled = true;
+      document.getElementById('disconnectStreamBtn').disabled = false;
+      if (document.getElementById('liveAgentsChk') && document.getElementById('liveAgentsChk').checked) startAgentsLive(3000);
+    }
+
+    function disconnectStream() {
+      if (currentSse) { currentSse.close(); currentSse = null; }
+      document.getElementById('connectStreamBtn').disabled = false;
+      document.getElementById('disconnectStreamBtn').disabled = true;
+      stopAgentsLive();
+    }
+
+    // live agents polling
+    let agentsPollHandle = null;
+    function startAgentsLive(pollMs = 3000) { stopAgentsLive(); agentsPollHandle = setInterval(async () => { try { await refreshSelected(); } catch (e) { console.warn(e); } }, pollMs); }
+    function stopAgentsLive() { if (agentsPollHandle) { clearInterval(agentsPollHandle); agentsPollHandle = null; } }
+
+    document.getElementById('connectStreamBtn').addEventListener('click', connectStream);
+    document.getElementById('disconnectStreamBtn').addEventListener('click', disconnectStream);
+
+    // basic bindings
+    document.getElementById('listChannelsBtn').addEventListener('click', listChannels);
+    document.getElementById('refreshChannelBtn').addEventListener('click', refreshSelected);
+    document.getElementById('viewMessagesBtn').addEventListener('click', ()=>viewMessages(0));
+    document.getElementById('removeChannelBtn').addEventListener('click', removeChannel);
+    document.getElementById('resetCounterBtn').addEventListener('click', resetCounter);
+    document.getElementById('loadAuditBtn').addEventListener('click', loadAudit);
+
+    document.getElementById('sourceSelect').addEventListener('change', updateSourceIndicator);
+
+    // Disconnect agent by name (calls server endpoint with { agentName })
+    async function disconnectAgentByName() {
+      const cid = document.getElementById('channelId').value.trim();
+      const name = document.getElementById('agentNameToDisconnect').value.trim();
+      if (!cid) return alert('Set channel id');
+      if (!name) return alert('Set agent name');
+      if (!confirm('Disconnect agent ' + name + ' from channel ' + cid + '?')) return;
+      const headers = getHeaders();
+      const body = { agentName: name };
+      const res = await fetch(base + '/channels/' + encodeURIComponent(cid) + '/disconnect-agent', {method:'POST', headers, body: JSON.stringify(body)});
+      const json = await res.json();
+      if (!isSuccess(json)) return alert('Failed: ' + getErrorMessage(json));
+      alert('Disconnected: ' + JSON.stringify(getData(json).removed || getData(json)));
+      // refresh agent list
+      await refreshSelected();
+    }
+
+    document.getElementById('disconnectByNameBtn').addEventListener('click', disconnectAgentByName);
+
+    // Update source indicator when viewing messages
+    const origViewMessages = viewMessages;
+    window.viewMessages = async function(offset=null) {
+      updateSourceIndicator();
+      return await origViewMessages(offset);
+    };
+
+    // set initial indicator
+    updateSourceIndicator();
+
+    // auto-load channels on page open
+    (async ()=>{ try{ await listChannels(); await loadAudit(); }catch(e){ console.warn(e); } })();
+  </script>
+</body>
+</html>

@@ -1,7 +1,12 @@
-rootProject.name = "messaging-api"
-include("services:kafka-service")
+rootProject.name = "messaging-platform"
+include ("messaging-common")
+include("services:messaging-service")
+
+// Updated agent module names after repo reorganization
 include("agents:java-agent")
 include("agents:web-agent")
 include("agents:python-agent")
 
-gradle.ext.messagingApiUrl = '/messaging-api/origin-service'
+// Includes for example agents (chat examples only - gaming servers removed in demo branch)
+include("agents:examples:java-agent-chat")
+include("agents:examples:python-agent-chat")

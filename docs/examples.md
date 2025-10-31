@@ -8,7 +8,7 @@ This document provides full examples of **service requests and responses** for t
 
 **Request:**
 ```bash
-curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=connect'   --data-raw '{
+curl 'https://hmdevonline.com/messaging-platform/api/v1/messaging-service/connect'   --data-raw '{
     "channelName":"system001",
     "channelPassword":"25d55ad283aa400af464c76d713c07ad",
     "agentName":"web-agent-001",
@@ -35,11 +35,11 @@ curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=
 
 ---
 
-## 👥 Active Agents
+## 👥 List Active Agents
 
 **Request:**
 ```bash
-curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=active-agents'   --data-raw '{"session":"042e84ca3232416f9eaecc3818fd67be"}'
+curl 'https://hmdevonline.com/messaging-platform/api/v1/messaging-service/list-agents'   --data-raw '{"session":"042e84ca3232416f9eaecc3818fd67be"}'
 ```
 
 **Response:**
@@ -76,7 +76,7 @@ curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=
 
 **Request:**
 ```bash
-curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=receive'   --data-raw '{"session":"da44fb94d3d04833a8c5755c791dfb84","range":"3-22"}'
+curl 'https://hmdevonline.com/messaging-platform/api/v1/messaging-service/receive'   --data-raw '{"session":"da44fb94d3d04833a8c5755c791dfb84","offsetRange":"3-22"}'
 ```
 
 **Response:**
@@ -108,7 +108,7 @@ curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=
 
 **Request:**
 ```bash
-curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=event'   --data-raw '{
+curl 'https://hmdevonline.com/messaging-platform/api/v1/messaging-service/event'   --data-raw '{
     "type":"chat-text",
     "to":".*",
     "encrypted":true,
@@ -131,7 +131,7 @@ curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=
 
 **Request:**
 ```bash
-curl 'https://hmdevonline.com/messaging-api/origin-service/?web-agent-001action=disconnect'   --data-raw '{"session":"da44fb94d3d04833a8c5755c791dfb84"}'
+curl 'https://hmdevonline.com/messaging-platform/api/v1/messaging-service/disconnect'   --data-raw '{"session":"da44fb94d3d04833a8c5755c791dfb84"}'
 ```
 
 **Response:**

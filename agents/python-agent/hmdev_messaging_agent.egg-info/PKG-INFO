@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: hmdev-messaging-agent
+Version: 1.0.0
+Summary: Messaging Platform - Python Agent package (TCP control server and helpers)
+Author: HaithamMubarak
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.28.0
+Requires-Dist: cryptography>=42.0.0
+Requires-Dist: pycryptodome>=3.20.0
+Dynamic: author
+Dynamic: classifier
+Dynamic: description-content-type
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

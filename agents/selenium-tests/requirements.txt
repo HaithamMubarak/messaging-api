@@ -1,0 +1,6 @@
+pytest
+selenium
+requests
+psutil
+pytest-xdist
+

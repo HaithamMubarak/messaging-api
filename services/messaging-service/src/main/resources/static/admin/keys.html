@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Developer Keys — Admin</title>
+  <style>
+    body{font-family:Inter,Arial,Helvetica,sans-serif;margin:18px;background:#f7f9fc}
+    .card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    input,button{padding:8px;border:1px solid #e6eef8;border-radius:6px}
+    button{background:#0b69ff;color:#fff;border:none}
+    .list{margin-top:12px}
+    .muted{color:#6b7280}
+  </style>
+</head>
+<body>
+  <h2>Developer API Keys</h2>
+  <div class="card">
+    <label>Email</label><br>
+    <input id="email" placeholder="developer email" style="width:360px" />
+    <label style="margin-left:8px">API Key</label>
+    <input id="adminKey" placeholder="API Key" style="width:240px" />
+    <button id="getKeys" style="margin-left:8px">Get Keys</button>
+    <div class="list" id="result">No results</div>
+  </div>
+
+<script>
+  document.getElementById('getKeys').addEventListener('click', async function(){
+    const email = document.getElementById('email').value.trim();
+    const adminKey = document.getElementById('adminKey').value.trim();
+    if(!email) return alert('Email required');
+    const url = '/messaging-platform/api/v1/messaging-service/admin/api-keys?email=' + encodeURIComponent(email);
+    const headers = { 'Content-Type':'application/json' };
+    if(adminKey) headers['X-Api-Key'] = adminKey;
+    const res = await fetch(url, { headers });
+    const j = await res.json();
+    const out = document.getElementById('result');
+    if(!j || j.status !== 'success'){
+      out.innerHTML = '<div class="muted">Error: ' + (j && (j.statusMessage || j.error) ? (j.statusMessage || j.error) : 'Unknown') + '</div>';
+      return;
+    }
+    const ids = j.data || [];
+    if(!ids.length) out.innerHTML = '<div class="muted">No keys found</div>';
+    else out.innerHTML = '<ul>' + ids.map(i=>'<li><code>'+i+'</code></li>').join('') + '</ul>';
+  });
+</script>
+</body>
+</html>

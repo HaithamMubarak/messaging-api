@@ -7,7 +7,10 @@ All messages are **end-to-end encrypted** — the Origin Service only relays cip
 
 ## 🟩 Step 1 — Web Agent connects
 
-1. Open the Web Agent UI (`/messaging-api/web-agent/index.html`).
+1. Open the Web Agent UI (`/messaging-platform/web-agent/index.html`).
+
+> Note: The Web Agent UI has been visually enhanced but follows the same concepts shown in this demo. The updated UI includes an input for an API key / API key ID (in addition to channel name/password) to support POC and production-style workflows — you can provide an API key instead of a channel password when appropriate.
+
 2. Enter:
    - **Channel Name:** `system001`
    - **Channel Password:** `12345678`
@@ -33,7 +36,7 @@ Run the agents using their command-line interfaces.
 
 ### Java Agent
 ```bash
-./gradlew :agents:java-agent:run --args="--channel system001 --password 12345678 --agent-name java-agent001"
+./gradlew :agents:examples:java-agent-chat:run --args="--channel system001 --password 12345678 --agent-name java-agent001"
 ```
 
 📸 *Java Agent Connection and Message*
@@ -41,8 +44,7 @@ Run the agents using their command-line interfaces.
 
 ### Python Agent
 ```bash
-cd agents/python-agent
-python -m hmdev.messaging.agent.main --channel system001 --password 12345678 --agent-name python-agent-001
+python agents/examples/python-agent-chat/chat_example.py --channel system001 --password 12345678 --agent-name python-agent-001
 ```
 
 📸 *Python Agent Connection and Message*

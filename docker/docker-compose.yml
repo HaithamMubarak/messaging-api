@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  kafka:
+    image: apache/kafka:4.1.0
+    container_name: messaging_kafka
+    user: "0"
+    # No ports published: kafka will be reachable only from other containers on the same Docker network
+    environment:
+      # Run single-node KRaft (controller+broker) - suitable for local development
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: "1"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      # Single pair of listeners for internal-only use: client listener and controller listener
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      # Advertise the container service name so other containers connect to kafka:9092
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LOG_DIRS: "/kafka/data"
+    volumes:
+      - kafka_data:/kafka/data
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: messaging_postgres
+    environment:
+      POSTGRES_USER: messaging
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: messaging_db
+      # Optional: set PGDATA if you want a non-default location
+      PGDATA: /var/lib/postgresql/data/pgdata
+    # Postgres is reachable to other containers by the service name 'postgres'. Do not expose on the host by default.
+    # Uncomment the ports block below if you need to connect from the host (psql, DataGrip, etc.).
+    # ports:
+    #   - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messaging -d messaging_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    secrets:
+      - postgres_password
+
+  messaging-service:
+    build:
+      # Use repository root as build context so Dockerfile can COPY repository-root relative paths
+      context: ..
+      dockerfile: docker/messaging-service/Dockerfile
+    image: messaging-platform/messaging-service:latest
+    # Load repository-level env file for local development defaults
+    env_file: ../.env
+    container_name: messaging_service
+    ports:
+      # Expose HTTP port for messaging service
+      - "8082:8080"
+    environment:
+      # Kafka connection settings
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Enable remote JVM debugging on port 5005. By default suspend=n so the JVM does not wait for a debugger.
+      # If you want the JVM to wait for the debugger at startup, change suspend=n -> suspend=y
+      # Preserve memory options and add the JDWP agent so we don't lose the defaults from the Dockerfile
+      JAVA_OPTS: "-Xms256m -Xmx512m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      # Postgres datasource configuration (Spring Boot expects a JDBC URL and credentials)
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/messaging_db"
+      SPRING_DATASOURCE_USERNAME: "messaging"
+      # Disable Redis session and cache (demo mode uses in-memory)
+      SPRING_SESSION_STORE_TYPE: "none"
+      SPRING_CACHE_TYPE: "none"
+      # Admin basic auth (set here for development; use secrets in production)
+      MESSAGING_ADMIN_USER: "admin"
+      MESSAGING_ADMIN_PASSWORD: "admin"
+      # Also set Spring's default user so httpBasic has a principal to authenticate against
+      SPRING_SECURITY_USER_NAME: "admin"
+      SPRING_SECURITY_USER_PASSWORD: "admin"
+      MESSAGING_ADMIN_EMAIL: haitham.mubarak.dev@gmail.com
+      ADMIN_NAME: Haitham Mubarak (Dev)
+    depends_on:
+      - kafka
+      - postgres
+    secrets:
+      - postgres_password
+    # No host config mount by default: the image contains the built application.properties
+    # To override configuration at runtime you can set environment variables or mount a file manually.
+
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+
+volumes:
+  kafka_data:
+  postgres_data:

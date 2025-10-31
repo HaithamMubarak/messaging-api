@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    container_name: messaging_redis
+    volumes:
+      - redis_data:/data
+
+  kafka:
+    image: apache/kafka:4.1.0
+    container_name: messaging_kafka
+    user: "0"
+    environment:
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: "1"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LOG_DIRS: "/kafka/data"
+    volumes:
+      - kafka_data:/kafka/data
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: messaging_postgres
+    environment:
+      POSTGRES_USER: messaging
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: messaging_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messaging -d messaging_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    secrets:
+      - postgres_password
+
+  messaging-service:
+    image: "haithammubarak/messaging-platform:messaging-service"
+    container_name: messaging_service
+    ports:
+      - "9999:9999/udp"
+    environment:
+      SPRING_REDIS_HOST: redis
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      UDP_LISTENER_PORT: "9999"
+      JAVA_OPTS: "-Xms256m -Xmx512m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/messaging_db"
+      SPRING_DATASOURCE_USERNAME: "messaging"
+      MESSAGING_ADMIN_USER: "admin"
+      MESSAGING_ADMIN_PASSWORD: "admin"
+      SPRING_SECURITY_USER_NAME: "admin"
+      SPRING_SECURITY_USER_PASSWORD: "admin"
+      MESSAGING_ADMIN_EMAIL: haitham.mubarak.dev@gmail.com
+      ADMIN_NAME: "Haitham Mubarak (Dev)"
+    depends_on:
+      - redis
+      - kafka
+      - postgres
+    secrets:
+      - postgres_password
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+
+volumes:
+  redis_data:
+  kafka_data:
+  postgres_data:
+
+# Notes:
+# - This compose file is self-contained and includes Redis, Kafka and Postgres + the messaging service image from Docker Hub.
+# - To run using the Hub image (no local build):
+#     docker compose -f docker-compose.hub.yml up -d --pull --no-build
+# - If you want to build the messaging-service image locally instead, use the main compose file which contains the build context, or run a build separately and then run this file.

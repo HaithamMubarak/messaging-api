@@ -1,20 +1,32 @@
 package com.hmdev.messaging.agent.api;
 
+import com.hmdev.messaging.common.data.*;
 
-import com.hmdev.messaging.agent.util.ApiResponse;
+import java.util.List;
 
 public interface ConnectionChannelApi {
 
-    ApiResponse connect(String channelName, String channelKey, String agentName) throws Exception;
+    String getChannelSecret();
 
-    ApiResponse connect(String channelName, String channelKey, String agentName, String sessionId) throws Exception;
+    void setChannelSecret(String channelSecret);
 
-    ApiResponse receive(String session, String range);
+    ConnectResponse connect(String channelName, String channelKey, String agentName);
 
-    ApiResponse getActiveAgents(String session);
+    ConnectResponse connect(String channelName, String channelKey, String agentName, String sessionId);
 
-    ApiResponse send(String msg, String destAgent, String session);
+    // New overloads: connect using server-side channelId directly
+    ConnectResponse connect(String channelName, String channelKey, String agentName, String sessionId, String channelId);
 
-    ApiResponse disconnect(String session);
+    ConnectResponse connectWithChannelId (String agentName,String channelId, String sessionId);
+
+    EventMessageResult receive(String session, ReceiveConfig receiveConfig);
+
+    List<AgentInfo> getActiveAgents(String session);
+
+    boolean send( String msg, String destAgent, String session);
+
+    boolean send(EventMessage.EventType eventType, String msg, String destAgent, String session, boolean encrypted);
+
+    boolean disconnect(String session);
 
 }

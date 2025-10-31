@@ -1,0 +1,20 @@
+# Minimal sshd_config for gateway container
+# Explicitly enable TCP forwarding so SSH port forwards (ssh -L) work
+Port 22
+Protocol 2
+PermitRootLogin yes
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+# Allow local and remote port forwarding
+AllowTcpForwarding yes
+# Do not allow gateway to bind to public interfaces by default
+GatewayPorts no
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+UsePAM no
+PidFile /var/run/sshd.pid
+SyslogFacility AUTH
+LogLevel INFO
+# sftp subsystem (path in Alpine openssh)
+Subsystem sftp /usr/lib/ssh/sftp-server
+

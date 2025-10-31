@@ -15,6 +15,18 @@ class HttpClient:
         self._last_window_start = time.time()
         self._requests_in_window = 0
         self._requests_limit = requests_limit
+        # Optional default headers (e.g., X-Api-Key). Agents should pass any default headers explicitly.
+        self._default_headers = {}
+
+    def set_default_header(self, name: str, value: Optional[str]) -> None:
+        """Set or clear a default header applied to every request (e.g. X-Api-Key).
+
+        Pass value=None to remove the header.
+        """
+        if value is None:
+            self._default_headers.pop(name, None)
+        else:
+            self._default_headers[name] = value
 
     def _throttle(self) -> None:
         now = time.time()
@@ -29,19 +41,21 @@ class HttpClient:
             self._last_window_start = time.time()
             self._requests_in_window = 1
 
-    def request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None):
+    def request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None, timeout: int = 30):
         self._throttle()
         url = self.remote_url + path
         headers = {"User-Agent": self.USER_AGENT}
+        # Merge default headers if present (e.g., DEFAULT_API_KEY)
+        if hasattr(self, '_default_headers') and self._default_headers:
+            headers.update(self._default_headers)
         try:
             if method.upper() == "GET":
-                r = requests.get(url, params=params or {}, headers=headers, timeout=20)
+                r = requests.get(url, params=params or {}, headers=headers, timeout=timeout)
             else:
-                r = requests.post(url, params=params or {}, json=json_body or {}, headers=headers, timeout=20)
+                r = requests.post(url, params=params or {}, json=json_body or {}, headers=headers, timeout=timeout)
             r.raise_for_status()
             return r.text
         except Exception as e:
-            logger.error("HTTP %s %s failed: %s", method, url, e)
             raise
 
     def close_all(self):

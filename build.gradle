@@ -2,62 +2,23 @@ plugins {
     id 'base'
 }
 
-def artifactDir = layout.buildDirectory.dir("artifacts")
-
-// Pick up messagingApiUrl from command line (-P) or settings.gradle (default)
-ext {
-    messagingApiUrl = (project.findProperty("messagingApiUrl")
-            ?: (gradle.ext.has("messagingApiUrl") ? gradle.ext.messagingApiUrl : "/messaging-api/origin-service"))
-}
-
-// Clean artifacts
-tasks.register("cleanArtifacts") {
-    group = "build"
-    doLast {
-        delete artifactDir
-        println "Cleaned ${artifactDir.get().asFile}"
+allprojects {
+    group = 'com.hmdev.messaging'
+    version = '1.0.0'
+    repositories {
+        mavenCentral()
     }
 }
 
-// Copy origin service
-tasks.register("copyPhpService", Copy) {
-    group = "build"
-    from("services/origin-service")
-    into(artifactDir.map { it.dir("origin-service") })
-}
+subprojects {
+    apply plugin: 'java'
+    sourceCompatibility = '11'
+    targetCompatibility = '11'
 
-// Copy JS agent with URL injection
-tasks.register("copyJsAgent", Copy) {
-    group = "build"
-    from("agents/web-agent") {
-        include "**/*.html"
-        include "**/*.js"
-        include "**/*.css"
-        include "images/**"
-        include "html5-components/**"
-    }
-    into(artifactDir.map { it.dir("web-agent") })
-
-    // Inject messagingApiUrl into init-agent.js
-    filesMatching("**/init-agent.js") {
-        filter { line ->
-            line.replaceAll(/window\.messagingApiUrl\s*=\s*['"].*?['"];/,
-                    "window.messagingApiUrl = '${ext.messagingApiUrl}';")
-        }
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
     }
 }
-
-// Assemble both artifacts
-tasks.register("assembleArtifacts") {
-    group = "build"
-    dependsOn("copyPhpService", "copyJsAgent")
-}
-
-// Make root build depend on assemble
-tasks.named("build") {
-    dependsOn("assembleArtifacts")
-}
-
 
 configure(project(":agents:python-agent")) {
     // Prevent Gradle from treating it as a Java project
@@ -66,78 +27,30 @@ configure(project(":agents:python-agent")) {
     }
 }
 
+ext {
+    // Default compose file path (absolute) - always use the repository compose file
+    def defaultCompose = new File(projectDir, 'docker/docker-compose.yml').absolutePath
 
-// -------------------------
-// Docker Service Build Tasks
-// -------------------------
-
-// Gets docker related config
-def isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
-def baseDir = projectDir.toString().replace("\\", "/")
-def hostDataDir = isWindows ? "${baseDir}/data/origin-service/channels" : "/root/data/messaging-api/origin-service/channels"
-def containerDataDir = "/var/www/html/messaging-api/origin-service/channels"
-
-static def shellCommand(cmd, isWindows) {
-    if (isWindows) {
-        return ["cmd", "/c", cmd]
-    } else {
-        return ["sh", "-c", cmd]
-    }
-}
-// -------------------------
-// Origin Service Tasks
-// -------------------------
-
-// Build Docker image
-tasks.register("originServiceBuild", Exec) {
-    commandLine 'docker', 'build',
-            '-f', 'docker/Dockerfile.origin-service',
-            '-t', 'messaging-api:origin-service', '.'
-
-    doFirst {
-        println ">>> Executing: ${commandLine.join(' ')}"
-    }
+    // Always use the repo compose file; the Gradle helper no longer supports a dockerhub property
+    project.ext.set('messagingDockerComposeFile', defaultCompose.toString())
 }
 
-tasks.register("chmodHostDir", Exec) {
-    onlyIf { !isWindows }
-    doFirst {
-        println ">>> Preparing host data directory: ${hostDataDir}"
-        mkdir(hostDataDir)
-    }
-    commandLine 'chmod', '777', hostDataDir
+// Build the messaging-service artifact and start the compose stack
+tasks.register('messagingServiceUp', Exec) {
+    group = 'docker'
+    description = 'Build messaging-service jar and start docker compose stack (up --build -d)'
+    // Ensure the host-side jar/resources are built before running docker compose
+    dependsOn ':services:messaging-service:build'
+    executable = 'docker'
+    args = ['compose', '-f', messagingDockerComposeFile, 'up', '--build', '-d']
+    standardInput = System.in
 }
 
-// Run container with mounted folder
-tasks.register("originServiceRun", Exec) {
-    dependsOn("chmodHostDir")
-    doFirst {
-        println ">>> Executing: docker run -d -p 8080:80 --name origin-service -v ${hostDataDir}:${containerDataDir} messaging-api:origin-service"
-    }
-
-    commandLine shellCommand("""
-        docker container rm -f origin-service || true && \
-        docker run -d -p 8080:80 \
-            --name origin-service \
-            -v ${hostDataDir}:${containerDataDir} \
-            messaging-api:origin-service
-    """, isWindows)
-}
-
-// Stop container
-tasks.register("originServiceStop", Exec) {
-    commandLine shellCommand("docker container stop origin-service || true && docker container rm origin-service || true", isWindows)
-
-    doFirst {
-        println ">>> Executing: ${commandLine.join(' ')}"
-    }
-}
-
-// Build + Run
-tasks.register("originServiceUp") {
-    dependsOn("originServiceBuild", "originServiceRun")
-
-    doFirst {
-        println ">>> Running Origin Service (Build + Run)"
-    }
+// Stop and remove the messaging service compose stack and volumes
+tasks.register('messagingServiceDown', Exec) {
+    group = 'docker'
+    description = 'Stop and remove messaging service compose stack and volumes'
+    executable = 'docker'
+    args = ['compose', '-f', messagingDockerComposeFile, 'down', '-v']
+    standardInput = System.in
 }

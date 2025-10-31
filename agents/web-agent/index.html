@@ -1,1190 +1,1446 @@
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>HTTP Channel API</title>
-    <meta charset="UTF-8" name="viewport"
-          content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi"/>
-
-    <script src="js/utils.js"></script>
-
-    <script src="js/lib/jquery.js"></script>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Messaging Platform — Web Agent</title>
 
     <link rel="stylesheet" href="css/common.css"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/emojify.js/1.1.0/js/emojify.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/emojify.js/1.1.0/css/basic/emojify.min.css"/>
-
-    <script src="js/init-agent.js"></script>
+    <link rel="stylesheet" href="css/icons.css"/>
 
     <style>
+        /* Adopted modern admin chat style for web-agent page (keeps IDs for compatibility) */
+        /* --- form layout improvements --- */
+        .form-row { gap: 8px; }
+        /* Keep labels consistent and aligned above inputs */
+        .form-row > label { display:block; margin:0 0 6px 0; font-size:13px; color:var(--muted); }
 
-        body, button {
-            font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
+        /* Make all form controls align and fill available width */
+        .form-row input[type=text], .form-row input[type=password], .form-row select, .form-row textarea {
+            width:100%;
+            height:40px;
+            padding:8px 10px;
+            border-radius:8px;
+            border:1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.02);
+            color: #e6eef8;
+            font-size:13px;
         }
 
-        .config input {
-            border-radius: 20px;
-            padding-left: 7px;
-            color: #467792;
-            background-color: #acd8f0;
-            outline: none;
-        }
+        /* textarea should be a bit taller */
+        textarea#agentmsg { height:72px; padding:10px 12px; }
 
-        .config label, .config input {
-            float: left;
-            width: 100%;
-        }
+        /* Make the select slightly more compact while visually matching inputs */
+        #channelMode { width:160px; height:36px; padding:6px 8px; appearance:none; -moz-appearance:none; -webkit-appearance:none; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); color:#e6eef8; border-radius:8px; }
+        /* Ensure the dropdown options use the dark panel background so text is visible on all platforms */
+        #channelMode option { background: var(--panel); color: #e6eef8; }
 
-        .right-side-container, .left-side-container {
-            cursor: default;
-            width: 100%;
-            position: relative;
-        }
+        /* When channelMode is next to other controls, keep spacing reasonable */
+        .form-row > div[style] { display:flex; align-items:center; gap:8px; }
 
-        .message-user {
-            color: #927878;
-            font-weight: bold;
-            position: absolute;
-            top: -20px;
-            text-align: center;
-            float: left;
-            left: 0;
-            white-space: nowrap;
-        }
-
-        .right-side-container {
-            float: right;
-        }
-
-        .left-side-container {
-            float: left;
-        }
-
-        .left-side-container, .right-side-container {
-            margin-top: 7px;
-            margin-bottom: 7px;
-            width: 100%;
-        }
-
-        .side-message {
-            padding: 7px;
-            margin-top: 20px;
-            word-wrap: break-word;
-            max-width: 70%;
-            font-size: 13px;
-            border-radius: 7px;
-            padding-left: 20px;
-            padding-right: 20px;
-            box-sizing: border-box;
-            box-shadow: 2px 2px 2px #888888;
-        }
-
-        .side-message div {
-            width: 100%;
-        }
-
-        .side-message .msg-time {
-            font-size: 10px;
-            padding-top: 10px;
-            text-align: center;
-        }
-
-        .left-side-message .msg-time {
-            color: #9E9E9E;
-        }
-
-        .right-side-message .msg-time {
-            color: #795548;
-        }
-
-        .right-side-message {
-            float: right;
-            background-color: #00BCD4;
-            margin-right: 10px;
-            min-height: 30px;
-            color: white;
-            position: relative;
-        }
-
-        .left-side-message {
-            background-color: #f1f0f0;
-            min-height: 30px;
-            margin-left: 10px;
-            float: left;
-            color: black;
-            position: relative;
-        }
-
-        #usermsg {
-            border: none;
-            position: absolute;
-            left: 0;
-            right: 0;
-            width: 100%;
-            padding-left: 5px;
-            height: 90%;
-            padding-top: 5px;
-            overflow: auto;
-        }
-
-        .config {
-            margin-bottom: 10px;
-        }
-
-        .config {
-            position: absolute;
-            width: 90%;
-            margin: 0 auto;
-            left: 0;
-            right: 0;
-            text-align: center;
-            padding: 3px;
-            top: 0;
-            bottom: 190px;
-        }
-
-        #wrapper {
-            position: absolute;
-            bottom: 0;
-            overflow-y: auto;
-            overflow-x: hidden;
-            top: 220px;
-            left: 0;
-            right: 0;
-            border: 1px solid #ACD8F0;
-
-        }
-
-        .connection-buttons-container {
+        /* Control buttons sizing & alignment */
+        .controls {
             display: flex;
-            padding: 10px;
-            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap; /* allow buttons to wrap instead of overflowing */
+            align-items: center;
+        }
+        .controls .btn { min-width:72px; padding:10px 12px; text-align:center; box-sizing: border-box; }
+        .controls .btn.primary { font-weight:600; }
+        /* On narrow screens make buttons more compact */
+        @media (max-width: 420px) {
+            .controls .btn { min-width:56px; padding:8px 10px; font-size:13px; }
+        }
+
+        /* Small helper text alignment */
+        .small { margin-top:6px; }
+
+        /* Channel header tweaks: make elements vertically centered */
+        .header-right { align-items:center; }
+        .channel-id { min-width:120px; text-align:center }
+
+        /* Agent badge: add number badge spacing */
+        #agent-count { font-weight:700; min-width:20px; display:inline-block; text-align:center }
+
+        /* subtle hover affordances for inputs/buttons */
+        .btn:hover { filter:brightness(1.03); }
+        input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 3px rgba(79,70,229,0.06); border-color: rgba(79,70,229,0.6); }
+
+        :root {
+            --bg: #0f1724;
+            --panel: #0b1220;
+            --muted: #94a3b8;
+            --accent: #4f46e5;
+            --accent-2: #06b6d4;
+            --bubble: #081226;
+            --me: #0b2033
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial;
+            color: #e6eef8;
+            background: linear-gradient(180deg, #071225 0%, #071b2b 100%)
+        }
+
+        .app-shell {
+            display: flex;
+            height: 100vh;
+            gap: 18px;
+            padding: 18px
+        }
+
+        /* Left: connection panel */
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .brand img {
+            height: 36px
+        }
+
+        .brand .title {
+            font-weight: 700
+        }
+
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted)
+        }
+
+        input[type=text], input[type=password] {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            cursor: text;
+            height: 40px;
+            color: #e6eef8;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .small {
+            font-size: 12px;
+            color: var(--muted)
         }
 
 
-        #app-container {
-            text-align: left;
-            margin: 0 auto;
-            padding: 5px;
-            background: #fff;
-            min-height: 220px;
-            min-height: 220px;
-            width: 90%;
-            border: 1px solid #ACD8F0;
+        .btn {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            cursor: pointer
+        }
+
+        /* Improve visual affordance for disabled buttons */
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            filter: grayscale(20%);
+        }
+
+        .btn.primary {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            color: #fff
+        }
+
+        .btn.ghost {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid rgba(255, 255, 255, 0.03)
+        }
+
+        /* Right: chat */
+        .chat-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px
+        }
+
+        .channel-name {
+            font-weight: 700
+        }
+
+        .channel-description {
+            font-size: 13px;
+            color: var(--muted)
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .channel-id {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-weight: 600
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: 0;
+            color: var(--muted);
+            cursor: pointer
+        }
+
+        .chat-body {
+            flex: 1;
             overflow: auto;
-            height: calc(100% - 220px);
+            padding: 18px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative; /* added so floating bubble can be positioned inside */
         }
 
-        .user {
+        .messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .msg-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end
+        }
+
+        .msg-left {
+            justify-content: flex-start
+        }
+
+        .msg-right {
+            justify-content: flex-end
+        }
+
+        .avatar {
             width: 44px;
             height: 44px;
-            float: left;
-            border: 1px solid #888888;
-            border-radius: 22px;
-            overflow: hidden;
-        }
-
-        .user img {
-            width: 100%;
-            height: 100%;
-        }
-
-        .usermsg-mobile {
-            position: fixed;
-            bottom: 16px;
-            left: 0;
-            right: 0;
-            width: 93%;
-            margin: 0 auto;
-        }
-
-        .chat-box-botton-send {
-            background: url(images/send-chat-message.png);
-        }
-
-        .chat-box-botton-clear {
-            background: url(images/clear-chat-message.png);
-        }
-
-        .chat-box-botton {
-            background-repeat: no-repeat;
-            background-size: 30px;
-            width: 30px;
-            height: 30px;
-            cursor: pointer;
-            background-color: #acd8f0;
-            border: 1px solid #3498db;
-            border-radius: 4px;
-            margin-bottom: 3px;
-        }
-
-        .chat-box-botton:active {
-            background-color: #3498db;
-        }
-
-        .send-button-container {
-            width: 33px;
-            float: right;
-        }
-
-        .input-message-container {
-            margin: 0;
-            height: 100%;
-            position: absolute;
-            left: 0;
-            right: 45px;
-        }
-
-        .message-box-dim {
-            width: 87%;
-            margin: 0 auto;
-        }
-
-        .message-box {
-            background-color: white;
-            height: 75px;
-            position: relative;
-            border: 1px solid #3cb0fd;
-            padding: 3px;
-            box-sizing: border-box;
-        }
-
-        .connection-info {
-            text-align: left;
-            margin-top: 3px;
-            padding: 5px;
-        }
-
-        .clickable-text {
-            cursor: pointer;
-            text-decoration: underline;
-            color: blue;
-        }
-
-        .notification-container {
-            position: fixed;
-            right: 30px;
-            width: 20%;
-            min-width: 200px;
-            height: auto;
-            bottom: 20px;
-            overflow: auto;
-            z-index: 999;
-            padding: 3px;
-            box-sizing: border-box;
-
-        }
-
-        .notification {
-            margin: 3px 3px 3px 3px;
-            word-wrap: break-word;
-            padding: 5px;
-            height: auto;
             border-radius: 10px;
-            width: 98%;
-            overflow: auto;
-            background-color: rgba(76, 220, 76, 0.55);
-            border: 1px solid rgb(86, 180, 239);
-            box-shadow: 3px 3px 3px #888888;
-            box-sizing: border-box;
-            position: relative;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700
         }
 
-        .notification-close {
-            float: right;
-            cursor: pointer;
-            position: absolute;
-            top: 3px;
-            right: 3px;
-            padding: 5px;
+        .bubble { /*max-width:65%;*/
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #081225, #082036);
+            color: #dbeafe;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap
         }
 
-        .notification-close img {
-            width: 20px;
-            height: 20px;
+        .bubble.me {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            color: #071225
         }
 
-        .connection-event {
-            text-align: center;
-            padding: 5px;
-            width: 90%;
-            margin: 0 auto;
-            /*border-top: 1px solid rgba(158, 158, 158, 0.52);
-            border-bottom: 1px solid rgba(158, 158, 158, 0.52);*/
-            padding-bottom: 5px;
-            margin-bottom: 12px;
-            margin-top: 12px;
-            position: relative;
-            overflow: hidden;
-            box-sizing: border-box;
-            height: 26px;
+        .meta {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 6px
         }
 
-        .connection-event-connected {
-            color: #6baf1b;
+        .system-notice{ text-align:center;color:#9aa9be;font-size:13px;padding:6px 0;border-radius:8px }
+
+        .composer {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+            margin-top: 8px
         }
 
-        .connection-event-disconnected {
-            color: #9E9E9E;
+        .composer-left {
+            width: 320px
         }
 
-        .connection-event-text {
-            display: block;
-            margin: 0 auto;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            box-sizing: border-box;
-            padding-left: 8px;
-            padding-right: 8px;
-            cursor: default;
-            position: relative;
-            z-index: 10;
-            background-color: white;
-            min-width: 140px;
-            max-width: 200px;
-        }
-
-        .connection-event-line {
-            content: "";
-            position: absolute;
-            border-top: 1px solid #ACD8F0;
+        .api-key {
             width: 100%;
-            box-sizing: border-box;
-            left: 0;
-            z-index: 0;
-            top: 12.5px;
-
+            padding: 10px;
+            border-radius: 10px;
+            border: 0;
+            background: transparent;
+            color: #e6eef8
         }
 
-        /* Updated Buttons */
-        button.btn {
-            background-color: #3498db; /* Main button color */
-            color: white;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 6px;
-            font-size: 14px;
+        .composer-middle {
+            flex: 1
+        }
+
+        textarea#agentmsg {
+            width: 100%;
+            height: 56px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 0;
+            background: rgba(255, 255, 255, 0.02);
+            color: #dbeafe
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0
+        }
+
+        /* New messages floating bubble */
+        .new-messages-bubble {
+            position: absolute;
+            right: 22px;
+            bottom: 86px; /* above composer area (chat-body padding + composer height) */
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            color: #071225;
+            padding: 8px 12px;
+            border-radius: 999px;
             cursor: pointer;
-            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.2);
-            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 6px 18px rgba(4,6,23,0.6);
+            z-index: 30;
+            font-weight: 700;
+            font-size: 13px;
         }
 
-        button.btn:hover {
-            background-color: #2980b9; /* Darker on hover */
-            transform: translateY(-2px);
+        @media (max-width: 900px) {
+            .app-shell {
+                flex-direction: column;
+                padding: 12px
+            }
+
+            .sidebar {
+                width: 100%;
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between
+            }
+
+            .composer-left {
+                display: none
+            }
         }
 
-        button.btn:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-            box-shadow: none;
+        /* Connected agents modal styles */
+        .agents-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(3,6,23,0.6);
+            z-index: 60;
+            backdrop-filter: blur(4px);
         }
-
-        /* Updated Inputs (excluding message textarea) */
-        .config input {
-            border: 1px solid #3498db;
-            border-radius: 6px;
-            padding: 8px 10px;
-            font-size: 14px;
-            height: 40px; /* Increased height */
-            box-sizing: border-box;
-            box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.1);
+        .agents-modal {
+            display: none;
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(180deg, rgba(11,18,32,0.98), rgba(6,12,20,0.98));
+            border: 1px solid rgba(255,255,255,0.04);
+            color: #e6eef8;
+            width: 420px;
+            max-width: calc(100% - 32px);
+            border-radius: 12px;
+            padding: 14px;
+            z-index: 70;
+            box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+            animation: pop .12s ease-out;
         }
-
-        .config input:focus {
-            border-color: #2980b9;
-            outline: none;
-            box-shadow: 0 0 4px rgba(52, 152, 219, 0.6);
+        .agents-modal .header {
+            display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:8px
         }
-
-        /* Dark Mode */
-        body.dark-mode {
-            background-color: #121212;
-            color: #e0e0e0;
-        }
-
-        body.dark-mode #app-container {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-
-        body.dark-mode .config input {
-            background: #2c2c2c;
-            color: #e0e0e0;
-            border: 1px solid #555;
-        }
-
-        body.dark-mode .config label {
-            color: #bbb;
-        }
-
-        body.dark-mode button.btn {
-            background-color: #555;
-            color: #f1f1f1;
-        }
-
-        body.dark-mode button.btn:hover {
-            background-color: #777;
-        }
-
-        #darkModeToggle {
-
-        }
-
-        .chat-message{
-            font-family: system-ui;
-            font-size: 12px;
-        }
+        .agents-modal .title { font-weight:700; font-size:15px }
+        .agents-modal .sub { font-size:12px;color:var(--muted) }
+        .agents-modal .agents-list { display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto;padding:6px 2px }
+        .agents-modal .agent-item { display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent) }
+        .agents-modal .agent-avatar { width:40px;height:40px;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:700;color:#071225 }
+        .agents-modal .agent-name { font-weight:600 }
+        .agents-modal .agent-meta { font-size:12px;color:var(--muted) }
+        .agents-modal .agent-actions { margin-left:auto;display:flex;gap:8px }
+        .agents-modal .footer { display:flex;gap:8px;justify-content:space-between;margin-top:12px }
+        .agents-modal .close-btn { background:transparent;border:0;color:var(--muted);cursor:pointer;padding:6px;border-radius:8px }
+        .agents-modal .copy-btn { padding:8px 10px;border-radius:8px;border:0;background:rgba(255,255,255,0.03);color:var(--muted);cursor:pointer }
+        .agents-modal .empty { text-align:center;color:var(--muted);padding:18px 6px }
+        @keyframes pop { from { transform: translate(-50%, -54%) scale(.99); opacity:0 } to { transform: translate(-50%, -50%) scale(1); opacity:1 } }
 
     </style>
+
+    <script>window.messagingApiUrl = 'https://hmdevonline.com/messaging-platform/api/v1/messaging-service';</script>
+    <script>window.__DEFAULT_API_KEY = "c9b1c8f2-3a5b-4f2a-8d2b-1234567890ab";</script>
+    <script src="/messaging-platform/generated/web-agent/default-key.js"></script>
+    <script src="js/lib/jquery.js"></script>
+    <script src="js/web-agent.libs.js"></script>
+    <script src="js/web-agent.js"></script>
 </head>
-
 <body>
-<div class="config">
+<!-- inline SVG sprite (inlined for compatibility and single-request) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-clipboard" viewBox="0 0 24 24">
+        <path fill="currentColor"
+              d="M16 4h-1.5a1 1 0 0 1-1-1h-5a1 1 0 0 1-1 1H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM12 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/>
+    </symbol>
+    <symbol id="icon-send" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+    </symbol>
+    <symbol id="icon-copy" viewBox="0 0 24 24">
+        <path fill="currentColor"
+              d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+    </symbol>
+    <symbol id="icon-debug" viewBox="0 0 24 24">
+        <path fill="currentColor"
+              d="M12 2L3 7v6c0 5 3.8 9.7 9 11 5.2-1.3 9-6 9-11V7l-9-5zM11 14H8v-2h3v2zm5 0h-3v-2h3v2zM8 10H5V8h3v2z"/>
+    </symbol>
+</svg>
 
-			<span id="channel-input">
-				<label>Channel Name</label>
-				<input type="text" id="channelName" placeholder="channel name" value="default"/>
-				<label>Channel Password</label>
-				<input type="password" id="channelPassword" placeholder="channel password" value="default"/>
-			</span>
-
-    <label>Nick Name</label>
-    <input type="text" id="nickName" placeholder="your name" value=""/>
-</div>
-
-<div id="wrapper">
-
-    <div class="connection-buttons-container">
-        <!--<p class="welcome">Welcome, <b></b></p>-->
-
-        <button class="btn" type="submit" id="start" value="Connect">Connect</button>
-        <button class="btn" type="submit" id="close" value="Close" disabled="disabled">Disconnect</button>
-        <button class="btn" type="submit" id="clear" value="Clear" title="Clear">
-            <i class="fa-solid fa-trash"></i>
-        </button>
-        <button id="darkModeToggle" class="btn" type="button" title="Dark Mode">
-            <i class="fa-solid fa-moon"></i>
-        </button>
-
-        <div style="clear:both"></div>
-    </div>
-
-    <div id="app-container">
-
-    </div>
-
-
-    <div class="message-box-dim" style="padding: 7px;text-align:left;">
-        <label id="press-enter"><input type="checkbox" name="checkbox" checked="checked">Press enter to send</label>
-    </div>
-
-    <div class="message-box message-box-dim">
-
-        <div class="input-message-container">
-            <textarea name="usermsg" type="text" id="usermsg" placeholder="Type your message" style=""></textarea>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <img src="images/arrow-right.png" alt="logo"/>
+            <div class="title">Messaging Platform</div>
         </div>
 
-        <div class="send-button-container">
-            <div class="chat-box-botton chat-box-botton-send" class="" id="submitmsg"></div>
-            <div class="chat-box-botton chat-box-botton-clear" id="clearmsg"></div>
+        <div class="form-row">
+            <!-- Mode selector: choose whether to connect with Channel ID or Channel name/password -->
+            <div style="display:flex;gap:8px;align-items:center">
+                <label for="channelMode">Mode</label>
+
+                <select id="channelMode" aria-label="Connect using" title="Connect using">
+                    <option value="params">Name / Password</option>
+                    <option value="id">Channel ID</option>
+                </select>
+                <div style="flex:1"></div>
+            </div>
         </div>
 
-    </div>
+        <div  class="form-row" id="channel-name-row" >
+            <label for="channelName">Channel name</label>
+            <input id="channelName" type="text" placeholder="channel name" value="default"/>
+        </div>
 
-    <div class="connection-info message-box-dim" style="display:none;">
-        <span class="clickable-text" id="channel-text"></span> is connected with <span
-            class="users-count clickable-text"></span>
-    </div>
+        <div class="form-row" id="channel-password-row">
+            <label for="channelPassword">Channel password</label>
+            <input id="channelPassword" type="password" placeholder="channel password" value="default"/>
+        </div>
 
+        <div class="form-row">
+            <div id="channel-id-row">
+                <input id="channelId" type="text" placeholder="channel id"/>
+                <div class="small">Use existing channel ID to connect instantly.</div>
+            </div>
+
+         </div>
+
+        <div class="form-row">
+            <label for="agentName">Your name</label>
+            <input id="agentName" type="text" placeholder="your nick"/>
+        </div>
+
+        <div class="form-row">
+            <label for="apiKey">API Key (Key ID only)</label>
+            <input id="apiKey" type="text" placeholder="Paste API key id (UUID)"/>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+                <div class="small">Only the key id (UUID) is required. The client will send it as <code>X-Api-Key</code>.
+                </div>
+                <label style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);">
+                    <input id="useDefaultKey" type="checkbox" style="width:16px;height:16px;"/> Use default key
+                </label>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="start" class="btn primary">Connect</button>
+            <button id="close" class="btn ghost" disabled>Disconnect</button>
+        </div>
+
+        <div style="margin-top:auto;font-size:12px;color:var(--muted);">
+            <!--<strong>Note</strong>: This UI uses only key IDs (no secret) for simplified connections. -->
+        </div>
+    </aside>
+
+    <main class="chat-panel">
+        <header class="chat-header">
+            <div>
+                <!-- <div class="channel-name">Channel Chat</div>
+                <div class="channel-description">Connected to agents and messages</div> -->
+                <button id="clear" class="btn ghost">Clear Messages</button>
+            </div>
+            <div class="header-right">
+                <div>Channel:</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div id="channel-text" class="channel-id" title="Click to copy">—</div>
+                    <button id="copyChannelId" title="Copy channel id" class="icon-btn" aria-label="Copy channel id">
+                        <svg width="18" height="18">
+                            <use href="#icon-copy"></use>
+                        </svg>
+                    </button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                    <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px">
+                        <div>Agents: <span id="agent-count">—</span></div>
+                        <button id="agent-badge" title="Show connected agents" aria-label="Show connected agents"
+                                style="position:relative;background:transparent;border:0;cursor:pointer;padding:4px;display:inline-flex;align-items:center;gap:6px">
+                            <span id="agent-live" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6b7280;transition:background-color .2s ease"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section class="chat-body">
+            <div id="app-container" class="messages">
+                <div class="meta">Not connected</div>
+            </div>
+
+            <!-- new messages bubble (created once, managed by JS) -->
+            <div id="newMessagesBubble" class="new-messages-bubble" title="Jump to latest messages" aria-hidden="true">
+                <svg width="14" height="14" style="vertical-align:middle;color:inherit;filter:brightness(0) saturate(100%) invert(100%) sepia(0%);">
+                    <use href="#icon-send"></use>
+                </svg>
+                <span id="newMessagesCount">New</span>
+            </div>
+        </section>
+
+        <div class="composer">
+            <div class="composer-left" style="display: none">
+            </div>
+            <div class="composer-middle">
+                <label for="agentmsg" class="sr-only">Message</label>
+                <textarea id="agentmsg" placeholder="Type your message"></textarea>
+            </div>
+            <div class="composer-right">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <label for="enterToSend" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);">
+                        <input id="enterToSend" type="checkbox" style="width:16px;height:16px;" title="Press Enter to send message (Shift+Enter for newline)"/>
+                        Enter to send
+                    </label>
+                    <button id="submitmsg" class="btn primary" aria-label="Send message">
+                        <svg width="16" height="16" style="vertical-align:middle;margin-right:8px">
+                            <use href="#icon-send"></use>
+                        </svg>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Connected agents modal (hidden by default) -->
+    <div id="agents-overlay" class="agents-overlay" aria-hidden="true">
+        <div id="agents-modal" class="agents-modal" role="dialog" aria-labelledby="agentsModalTitle" aria-describedby="agentsModalDesc">
+            <div class="header">
+                <div>
+                    <div id="agentsModalTitle" class="title">Connected Agents</div>
+                    <div id="agentsModalDesc" class="sub">Total: <span id="agents-title-count">0</span></div>
+                </div>
+                <button class="close-btn" aria-label="Close modal">
+                    <svg width="18" height="18" style="vertical-align:middle">
+                        <use href="#icon-clipboard"></use>
+                    </svg>
+                </button>
+            </div>
+            <div id="agents-list" class="agents-list">
+                <!-- Agent items will be populated by JS -->
+            </div>
+            <div class="footer">
+                <button class="btn ghost close-btn" aria-label="Close modal">Close</button>
+                <button class="btn primary copy-btn" aria-label="Copy agent list">Copy List</button>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="notification-container">
-    <div class="notification notification-queue" style="display : none;"></div>
-</div>
+<script>
 
-<script type="text/javascript">
+    (function () {
+        // extract API response from event
+        window.getApiResponse = function(ev){
+            return ev.response;
+        }
 
-    document.addEventListener("DOMContentLoaded", function() {
-        const darkToggle = document.getElementById("darkModeToggle");
-        const icon = darkToggle.querySelector("i");
+        // Try to read a runtime-injected default API key (e.g. server may set window.__DEFAULT_API_KEY). Fallback to built-in dev key.
+        const defaultKey = (window.__DEFAULT_API_KEY && String(window.__DEFAULT_API_KEY).trim());
 
-        darkToggle.addEventListener("click", () => {
-            document.body.classList.toggle("dark-mode");
-            if (document.body.classList.contains("dark-mode")) {
-                icon.classList.remove("fa-moon");
-                icon.classList.add("fa-sun");
-                darkToggle.title = "Light Mode";
-            } else {
-                icon.classList.remove("fa-sun");
-                icon.classList.add("fa-moon");
-                darkToggle.title = "Dark Mode";
+        // default key handling (preserve localStorage)
+        try {
+            const chk = document.getElementById('useDefaultKey');
+            const apiEl = document.getElementById('apiKey');
+            // If the user hasn't set a preference, enable "Use default key" by default
+            const stored = localStorage.getItem('useDefaultApiKey');
+            const useDefault = (stored === null) ? true : (stored === '1');
+            // persist the default choice when there was no stored value so behavior is consistent
+            if (stored === null && useDefault) {
+                try { localStorage.setItem('useDefaultApiKey', '1'); } catch (e) {}
             }
-        });
-    });
+            if (chk) chk.checked = useDefault;
+            if (useDefault && apiEl && !apiEl.value.trim()) apiEl.value = defaultKey;
+            if (chk) {
+                chk.addEventListener('change', function () {
+                    if (this.checked) {
+                        localStorage.setItem('useDefaultApiKey', '1');
+                        if (apiEl && !apiEl.value.trim()) apiEl.value = defaultKey;
+                    } else {
+                        localStorage.removeItem('useDefaultApiKey');
+                    }
+                });
+            }
 
-    var channel;
-    var sending = false;
-    var messagesCount = 0;
-    var last = {date: null, type: null, user: null};
+            // load last channel params (channelName, channelPassword, channelId, agentName, sessionId)
+            const lastChannelName = localStorage.getItem('lastChannelName');
+            const lastChannelPassword = localStorage.getItem('lastChannelPassword');
+            const lastChannelId = localStorage.getItem('lastChannelId');
+            const lastAgentName = localStorage.getItem('lastAgentName');
+            // populate inputs if present and inputs are empty
+            const chNameEl = document.getElementById('channelName');
+            const chPassEl = document.getElementById('channelPassword');
+            const chIdEl = document.getElementById('channelId');
+            const agentEl = document.getElementById('agentName');
+            if (chNameEl && lastChannelName) chNameEl.value = lastChannelName;
+            if (chPassEl && lastChannelPassword) chPassEl.value = lastChannelPassword;
+            if (chIdEl && lastChannelId) chIdEl.value = lastChannelId;
+            if (agentEl && lastAgentName ) agentEl.value = lastAgentName;
 
-    function uiDeactiveState() {
+            // Channel mode (params | id) UI handling
+            function updateChannelModeUI(mode) {
+                try {
+                    const nameRow = document.getElementById('channel-name-row');
+                    const passRow = document.getElementById('channel-password-row');
+                    const idRow = document.getElementById('channel-id-row');
+                    if (!nameRow || !passRow || !idRow) return;
+                    if (mode === 'id') {
+                        nameRow.style.display = 'none';
+                        passRow.style.display = 'none';
+                        idRow.style.display = 'block';
+                    } else {
+                        nameRow.style.display = 'block';
+                        passRow.style.display = 'block';
+                        idRow.style.display = 'none';
+                    }
+                    try { localStorage.setItem('lastChannelMode', mode); } catch(e){}
+                } catch (e) { console.warn('updateChannelModeUI', e); }
+            }
 
-        $('#start,#channelName,#channelPassword,#nickName').attr('disabled', false);
-        $('#close,#submitmsg').attr('disabled', true);
-
-        $('#channel-input').show();
-        $('#wrapper').attr('style', '');
-
-        $('.connection-info').hide();
-    }
-
-    function uiActiveState() {
-        $('#start,#channelName,#channelPassword,#nickName').attr('disabled', true);
-        $('#close,#submitmsg').attr('disabled', false);
-
-        $('#channel-input').hide();
-        $('#wrapper').attr('style', 'top: 80px;');
-
-        $('.connection-info').show();
-
-        var channelInfo = channel.getChannelInfo();
-        var sessionInfo = channel.getSessionInfo();
-
-        $('.connection-info #channel-text').html(channelInfo.name + '-' + channelInfo.id);
-        //$('.connection-info #channel-id').text(md5($('#channelName').val())+'-'+md5($('#channelPassword').val()));
-
-    }
-
-    function pressEnterMode(checked) {
-        //checkbox = checkbox || $(this).find('input');
-        //checkbox[0].checked
-        if (checked) {
-            $('.send-button-container').attr('style', 'width:66px;');
-            $('.chat-box-botton').attr('style', 'float :left');
-            $('.message-box').attr('style', 'height:40px;');
-            $('.input-message-container').attr('style', 'right:72px');
-            $('#usermsg').attr('style', 'font-size:15px');
-        } else {
-            $('.send-button-container').attr('style', '');
-            $('.chat-box-botton').attr('style', '');
-            $('.message-box').attr('style', '');
-            $('.input-message-container').attr('style', '');
-            $('#usermsg').attr('style', '');
-        }
-    }
-
-    function send() {
-
-        if (sending) {
-            return;
-        }
-
-        if (!channel) {
-            return alert('Please connect to a channel');
-        }
-
-        var message = $('#usermsg').val();
-
-        if (message) {
-            sending = true;
-            //$('.message-box').attr('style','background-color:#ebebe4;')
-            //$('submitmsg').attr('style','background-color:#ebebe4;');
-            //$('#usermsg').attr('disabled','disabled');
-
-            channel.sendMessage(message, function (response) {
-
-                if (response.status == 'success') {
-                    addSentMessage({name: "You", img: "images/you.png"}, message, new Date());
-                } else {
-                    alert(response.data);
+            const modeSelect = document.getElementById('channelMode');
+            try {
+                // determine initial mode: prefer stored, else use channelId presence
+                const storedMode = localStorage.getItem('lastChannelMode');
+                const initialMode = storedMode || (lastChannelId ? 'id' : 'params');
+                if (modeSelect) {
+                    modeSelect.value = initialMode;
+                    modeSelect.addEventListener('change', function () { updateChannelModeUI(this.value); });
                 }
+                updateChannelModeUI(initialMode);
+            } catch (e) { console.warn('init channel mode', e); }
 
-                setTimeout(function () {
-                    //$('.message-box').removeAttr('style')
-                    //$('submitmsg').removeAttr('style');
-                    //$('#usermsg').removeAttr('disabled');
-                    sending = false;
-                }, 500);
+        } catch (e) { console.warn(e); }
+
+        // toast
+        window.showToast = function (msg, type = 'info') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                Object.assign(container.style, {
+                    position: 'fixed',
+                    right: '18px',
+                    bottom: '18px',
+                    zIndex: 9999
+                });
+                document.body.appendChild(container);
+            }
+            const el = document.createElement('div');
+            el.textContent = msg;
+            el.style.background = type === 'error' ? '#e74c3c' : type === 'success' ? '#2ecc71' : '#0177c7';
+            el.style.color = '#fff';
+            el.style.padding = '10px 14px';
+            el.style.borderRadius = '8px';
+            el.style.marginTop = '8px';
+            el.style.transition = 'opacity 0.4s ease';
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 400);
+            }, 3500);
+        };
+
+        // safe element getters
+        function $(id) { return document.getElementById(id); }
+
+        // copy channel id
+        function copyChannelId() {
+            const el = $('channel-text');
+            const v = (el?.textContent || '').trim();
+            if (!v || v === '—') return showToast('No channel id', 'error');
+            navigator.clipboard.writeText(v)
+                .then(() => showToast('Channel id copied', 'success'))
+                .catch(() => showToast('Copy failed', 'error'));
+        }
+
+        if ($('copyChannelId')) $('copyChannelId').addEventListener('click', copyChannelId);
+        if ($('channel-text')) $('channel-text').addEventListener('click', copyChannelId);
+
+        // helper for channel updates
+        window.updateChannelDisplay = function (e) {
+            try {
+                const apiResp = e?.response?.data || window.lastApiResponse || null;
+                let cid = apiResp?.channelId || localStorage.lastChannelIdentifier || window.channel?._channel_id || '—';
+                $('channel-text').textContent = cid;
+            } catch (err) {
+                console.warn('updateChannelDisplay error', err);
+            }
+        };
+
+        // message rendering helper
+        function formatTime(d) {
+            const dt = d instanceof Date ? d : new Date(d);
+            return dt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        }
+
+        function setAgentCount(n) {
+            // Accepts a number or an array of agents
+            try {
+                let count = 0;
+                if (Array.isArray(n)) count = n.length;
+                else if (typeof n === 'number') count = n;
+                else if (n && typeof n === 'object' && typeof n.length === 'number') count = n.length;
+                const countEl = $('agent-count');
+                const live = $('agent-live');
+                const display = (typeof count === 'number' && count >= 0) ? count : '-';
+                if (countEl) countEl.textContent = display;
+                if (live) live.style.background = (count > 0) ? '#10b981' : '#6b7280';
+            } catch (e) { console.warn('setAgentCount', e); }
+        }
+
+        // If the agents modal is open, refresh its contents
+        function refreshAgentsModalIfOpen() {
+            try {
+                const modal = document.getElementById('agents-modal');
+                if (!modal) return;
+                if (modal.style.display !== 'block') return;
+                const agents = getConnectedAgentsList();
+                showAgentsModal(agents);
+            } catch (e) { console.warn('refreshAgentsModalIfOpen', e); }
+        }
+
+         function appendMessage(name, message, isMe, timestamp, opts) {
+             const container = document.querySelector('.chat-body');
+             console.log('container=', container)
+             if (!container) return;
+             opts = opts || {forceScroll: true};
+             const time = new Date(timestamp);
+             const row = document.createElement('div');
+             row.className = 'msg-row ' + (isMe ? 'msg-right' : 'msg-left');
+             const avatar = document.createElement('div');
+             avatar.className = 'avatar';
+             avatar.textContent = (name || 'U').substring(0, 1).toUpperCase();
+             // show full agent name on hover
+             avatar.title = name || '';
+             const col = document.createElement('div');
+             const bubble = document.createElement('div');
+             bubble.className = 'bubble ' + (isMe ? 'me' : '');
+             bubble.textContent = message;
+             const meta = document.createElement('div');
+             meta.className = 'meta';
+             meta.textContent = formatTime(time) + ' — ' + new Date(time).toLocaleDateString();
+             col.append(bubble, meta);
+             if (isMe) row.append(col, avatar); else row.append(avatar, col);
+             container.appendChild(row);
+
+             // scroll behavior: auto-scroll when the sender is "me" OR if the user is currently scrolled to the bottom.
+             const shouldForce = !!opts.forceScroll;
+             if (shouldForce || isMe || isScrolledToBottom(container)) {
+                 console.log('forceScroll....');
+                 container.scrollTop = container.scrollHeight;
+                 hideNewMessagesBubble();
+             } else {
+                 // user has scrolled up — show the new messages bubble and increment count
+                 incrementNewMessagesCount();
+             }
+         }
+
+         // System notification (centered) for agent online/offline
+         // type: 'info' (default), 'success' (green), 'error' (red)
+         function appendSystemNotification(text, type = 'info'){
+             try{
+                 const container = $('app-container'); if(!container) return;
+                 const el = document.createElement('div'); el.className = 'system-notice';
+                 // include timestamp for the event
+                 const now = new Date();
+                 const timeSpan = document.createElement('span');
+                 timeSpan.style.fontSize = '11px';
+                 timeSpan.style.color = '#94a3b8';
+                 timeSpan.style.marginRight = '8px';
+                 timeSpan.textContent = '[' + now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + ' ' + now.toLocaleDateString() + ']';
+                 const txt = document.createElement('span'); txt.textContent = text;
+                 el.appendChild(timeSpan);
+                 el.appendChild(txt);
+                 // style by type (inline to avoid touching global CSS)
+                 try{
+                     if(type === 'success'){
+                         el.style.color = '#10b981'; // green text
+                         el.style.background = 'rgba(16,185,129,0.04)';
+                         el.style.border = '1px solid rgba(16,185,129,0.08)';
+                         el.style.padding = '8px 10px';
+                         el.style.borderRadius = '8px';
+                     } else if(type === 'error'){
+                         el.style.color = '#f87171';
+                         el.style.background = 'rgba(248,113,113,0.04)';
+                         el.style.border = '1px solid rgba(248,113,113,0.08)';
+                         el.style.padding = '8px 10px';
+                         el.style.borderRadius = '8px';
+                     } else {
+                         el.style.color = '#9aa9be';
+                         el.style.padding = '6px 0';
+                     }
+                 }catch(e){}
+                 container.appendChild(el);
+
+                 // Only auto-scroll to bottom if the user is already at the bottom; otherwise show new messages indicator
+                 try {
+                     if (isScrolledToBottom(container)) {
+                         container.scrollTop = container.scrollHeight;
+                         hideNewMessagesBubble();
+                     } else {
+                         incrementNewMessagesCount();
+                     }
+                 } catch (e) { console.warn('appendSystemNotification scroll', e); }
+             }catch(e){ console.warn('appendSystemNotification', e); }
+         }
+
+        // safe event listeners
+        const msgEl = $('agentmsg');
+        const sendBtn = $('submitmsg');
+        const enterToSendChk = $('enterToSend');
+
+        // persist Enter-to-send preference in localStorage (off by default)
+        try {
+            const storedEnterPref = localStorage.getItem('enterToSend');
+            if (enterToSendChk) {
+                enterToSendChk.checked = (storedEnterPref === '1');
+                enterToSendChk.addEventListener('change', function () {
+                    try {
+                        if (this.checked) localStorage.setItem('enterToSend', '1'); else localStorage.removeItem('enterToSend');
+                    } catch (e) { /* no-op */ }
+                });
+            }
+        } catch (e) { /* ignore storage errors */ }
+
+        // Ensure send button is disabled by default until a channel is connected
+        if (sendBtn) sendBtn.disabled = true;
+
+        // Keyboard handling: when Enter-to-send is enabled, Enter sends message, Shift+Enter inserts newline
+        if (msgEl) {
+            msgEl.addEventListener('keydown', function (e) {
+                try {
+                    const chk = enterToSendChk || document.getElementById('enterToSend');
+                    const enabled = !!(chk && chk.checked) || (localStorage.getItem && localStorage.getItem('enterToSend') === '1');
+                    if (!enabled) return; // nothing to do when feature is off
+                    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                        e.preventDefault();
+                        // trigger send if send button is enabled
+                        if (sendBtn && !sendBtn.disabled) {
+                            sendBtn.click();
+                        }
+                    }
+                } catch (err) { console.warn('enterToSend keydown', err); }
             });
+        }
 
-            /*channel.status(function(s){
-                if(s.status == 'error'){
-                    sending = false;
-                    alert('No one is conencted to the channel');
-                }else{
-                    channel.sendMessage(message,function(response){
-                        sending = false;
-                        if(response.status == 'success'){
-                            addSentMessage({name : "You",img: "images/you.png"},message);
-                        }else{
-                            alert(response.data);
+        if (sendBtn) {
+            sendBtn.addEventListener('click', function () {
+                const txt = msgEl?.value?.trim();
+                if (!txt) return;
+                if (window.channel?.sendMessage) {
+                    // Send through channel. Do NOT append locally here; the server will broadcast
+                    // and the message will be appended when received through the channel message event.
+                    window.channel.sendMessage(txt, res => {
+                        if (res?.status === 'success') {
+                            msgEl.value = '';
+                        } else {
+                            showToast('Send failed', 'error');
                         }
                     });
-                }
-
-            });*/
-
-        }
-    }
-
-    function updateAgentsCount() {
-        let agents = channel.connectedAgents;
-        $('.users-count').text(agents.length + (agents.length === 1 ? " User" : " Users"));
-    }
-
-    var notifier = {
-        audio: {
-            default: new Audio('sounds/377017__elmasmalo1__notification-pop.wav')
-        },
-
-        playAudio: function (audio) {
-
-            audio = audio || this.audio.default;
-
-            if (audio.paused && !audio._quite) {
-                audio._quite = true;
-                setTimeout(function () {
-                    audio._quite = false;
-                }, 1000);
-                audio.play();
-            }
-        },
-
-        _focusList: [],
-        _blurList: [],
-        _wait: [],
-        enabled: false,
-        _active: 0,
-        maxNotification: 3,
-        liveTime: 6000,
-        active: false,
-        updateQueueCount: function () {
-            if (this._wait.length == 0) {
-                $('.notification-queue').hide();
-            } else {
-                $('.notification-queue').text('+' + this._wait.length);
-                $('.notification-queue').show();
-            }
-
-        },
-        show: function (title, text) {
-            var _self = this;
-
-            if (!_self.enabled) {
-                return;
-            }
-
-            if (arguments.length == 0) {
-                if (_self._active.length >= _self.maxNotification || _self._wait.length == 0) {
-                    return;
                 } else {
-                    var obj = _self._wait.splice(0, 1)[0];
-                    _self.updateQueueCount();
-                    title = obj.title;
-                    text = obj.text;
-
+                    // No channel library available: clear the input but do not append locally.
+                    msgEl.value = '';
+                    showToast('Local send not supported - offline', 'error');
                 }
-
-            } else if (_self._active >= _self.maxNotification) {
-                _self._wait.push({title: title, text: text});
-                _self.updateQueueCount();
-                return;
-            }
-
-            _self._active++;
-
-            title = title || 'Untitled';
-            text = text || '';
-
-            var el = $("<div class='notification'><div class='notification-close'><img src='images/close.png'/></div><h3>" + title + "</h3><p>" + text + "</p></div>");
-            $('.notification-container').append(el);
-
-            notifier.playAudio();
-
-            var resetCounter, fadeout;
-            var closed = false;
-            var wait = _self.liveTime;
-            var fadingOut = false;
-
-            fadeout = function (e, isDocEvent) {
-                fadingOut = true;
-
-                console.log('fadeout() with ' + wait);
-                el.fadeOut(wait, function () {
-                    _self.show();
-                    _self._active--;
-                    el.remove();
-
-                    _self._focusList.splice(_self._focusList.indexOf(fadeout), 1);
-                    _self._blurList.splice(_self._blurList.indexOf(resetCounter), 1);
-                });
-            }
-
-            resetCounter = function (e, fadeoutAfterReset, forceClose) {
-                if ((closed || !fadingOut) && !forceClose) {
-                    return;
-                }
-                if (forceClose) {
-                    closed = forceClose;
-                }
-
-                console.log('reset() with ' + fadeoutAfterReset);
-                el.stop();
-                el.css('opacity', '1');
-                fadingOut = false;
-
-                if (fadeoutAfterReset) {
-                    fadeout(e);
-                }
-
-                e.preventDefault();
-            }
-
-            el.click(function (e) {
-                e.preventDefault();
-                setTimeout(function () {
-                    resetCounter(e, false);
-                }, 200);
             });
+        }
 
-            el.find('.notification-close').click(function (e) {
-                console.log('close');
-                wait = 700;
-                setTimeout(function () {
-                    resetCounter(e, true, true);
-                }, 200);
+        // NEW: helpers for new messages bubble and scroll detection
+        let __newMessagesCount = 0;
+        const _containerEl = $('app-container');
+        const _bubbleEl = $('newMessagesBubble');
+        const _bubbleCountEl = $('newMessagesCount');
+
+        function isScrolledToBottom(el, threshold = 60) {
+            if (!el) return true;
+            try {
+                return (el.scrollHeight - (el.scrollTop + el.clientHeight)) <= threshold;
+            } catch (e) { return true; }
+        }
+
+        function showNewMessagesBubble() {
+            if (!_bubbleEl) return;
+            _bubbleEl.style.display = 'inline-flex';
+            _bubbleEl.setAttribute('aria-hidden', 'false');
+        }
+        function hideNewMessagesBubble() {
+            if (!_bubbleEl) return;
+            _bubbleEl.style.display = 'none';
+            _bubbleEl.setAttribute('aria-hidden', 'true');
+            __newMessagesCount = 0;
+            if (_bubbleCountEl) _bubbleCountEl.textContent = 'New';
+        }
+        function incrementNewMessagesCount() {
+            __newMessagesCount = (__newMessagesCount || 0) + 1;
+            if (_bubbleCountEl) {
+                _bubbleCountEl.textContent = (__newMessagesCount === 1) ? '1 new' : (__newMessagesCount + ' new');
+            }
+            showNewMessagesBubble();
+        }
+
+        // Bubble click -> scroll to bottom and hide
+        if (_bubbleEl) {
+            _bubbleEl.addEventListener('click', function () {
+                try {
+                    if (_containerEl) {
+                        _containerEl.scrollTop = _containerEl.scrollHeight;
+                        hideNewMessagesBubble();
+                    }
+                } catch (e) { console.warn('new bubble click', e); }
             });
-
-            _self._focusList.push(fadeout);
-            _self._blurList.push(resetCounter);
-
-            if (document.hasFocus()) {
-                fadeout(null);
-            }
-        }
-    }
-
-    $(window).focus(function (e) {
-        console.log('window click');
-        notifier._focusList.forEach(function (call) {
-            call(e);
-        });
-    });
-
-    $(window).blur(function (e) {
-        console.log('window blur');
-        notifier._blurList.forEach(function (call) {
-            call(e, false);
-        });
-    });
-
-    $(document).ready(function () {
-
-        var hash = parseHashParameters();
-
-        var email;
-        var invitation = hash.invitation;
-        var email = hash.email;
-
-        var errorMsg = "";
-
-        if (email && email != null) {
-            email = MySecurity.decrypt(email, 'email');
         }
 
-        if (!email || email == null) {
-            email = localStorage['invitation-email-' + invitation];
-        }
-
-        while (invitation) {
-
-            if (!email || email == null) {
-                email = prompt(errorMsg + "Please enter your email: ");
-            }
-
-            //unable to get email from hash/localstorage/prompt
-            if (!email || email == null) {
-                alert("Wrong email. You can't connect to your invitation unless you input your email correctly.");
-                invitation = false;
-                break;
-            }
-
-            email = email.trim();
-            var obj = decodeInvitationUrl(email);
-            if (!obj || !obj.channelName || !obj.channelPassword || !obj.nickName) {
-                errorMsg = "(Incorrect) ";
-            } else {
-
-                $('#channelName').val(obj.channelName);
-                $('#channelPassword').val(obj.channelPassword);
-                $('#nickName').val(obj.nickName);
-                localStorage['invitation-email-' + invitation] = email;
-
-                break;
-            }
-
-            email = null;
-        }
-
-
-        //bind events
-        $('.users-count').click(function () {
-            var users = channel.connectedAgents;
-
-            var usersStr = 'Connected users are :\n';
-            for (var i = 0; i < users.length; i++) {
-                usersStr += users[i] + '\n';
-            }
-            alert(usersStr);
-
-        });
-
-        $('#channel-text').click(function () {
-
-            var channelInfo = channel.getChannelInfo();
-            var sessionInfo = channel.getSessionInfo();
-            prompt('Channel name: ' + channelInfo.name + '\n' + 'Client is connected with session:', sessionInfo.id);
-
-        });
-
-        var enterCheckBox = $('#press-enter input')[0];
-        $('#press-enter').click(function () {
-            pressEnterMode(enterCheckBox.checked);
-        });
-        pressEnterMode(enterCheckBox.checked);
-
-        $('#usermsg').focus(function () {
-            setTimeout(function () {
-                $("#wrapper")[0].scrollTop = $("#wrapper")[0].scrollHeight;
-            }, 500);
-        });
-
-        $('#start').click(function () {
-
-            if (!$('#channelName').val()) {
-                return alert('Channel name is required');
-            }
-            if (!$('#channelPassword').val()) {
-                return alert('Channel password is required');
-            }
-
-            if (!$('#nickName').val()) {
-                //return alert('username is required');
-                $('#nickName').val("WEB-AGENT-" + guid());
-            }
-
-            channel.connect({
-                api: messagingApiUrl,
-                channelName: $('#channelName').val(),
-                channelKey: $('#channelPassword').val(),
-                agentName: $('#nickName').val(),
-                autoReceive: '1000:500:25000',
-                sessionId: localStorage.lastSessionId
+        // When the user manually scrolls to bottom, hide the bubble
+        if (_containerEl) {
+            _containerEl.addEventListener('scroll', function () {
+                try {
+                    if (isScrolledToBottom(_containerEl)) hideNewMessagesBubble();
+                } catch (e) { console.warn('container scroll', e); }
             });
-        });
+        }
 
-        $('#close').click(function () {
-            var users = channel.connectedAgents;
-            var lastOne = (users.length == 1);
+        // HTTPChannel integration: Connect / Disconnect / Clear logic
+        // Manage UI state for buttons and spinner
+        function setButtonsConnected(connected) {
+            try {
+                const startBtn = $('start');
+                const closeBtn = $('close');
+                if (!startBtn || !closeBtn) return;
+                if (connected) {
+                    // Connected: disable Start and style it as ghost; highlight Disconnect as primary
+                    startBtn.disabled = true;
+                    try { startBtn.classList.remove('primary'); } catch(e){}
+                    try { startBtn.classList.add('ghost'); } catch(e){}
+                    // change text/icon
+                    try { startBtn.dataset.orig = startBtn.dataset.orig || startBtn.innerHTML; } catch (e) {}
+                    try { startBtn.innerHTML = '✔ Connected'; } catch (e) {}
 
-            if (lastOne && messagesCount != 0) {
-                if (!confirm('You are the only user connected to channel, and messages will be cleared once you are disconnected. Are you sure to continue?')) {
-                    return;
+                    closeBtn.disabled = false;
+                    try { closeBtn.classList.remove('ghost'); } catch(e){}
+                    try { closeBtn.classList.add('primary'); } catch(e){}
+                    try { closeBtn.innerHTML = '⏻ Disconnect'; } catch(e){}
+                } else {
+                    // Disconnected: enable Start and restore primary background; make Disconnect ghost and disabled
+                    startBtn.disabled = false;
+                    try { startBtn.classList.remove('ghost'); } catch(e){}
+                    try { startBtn.classList.add('primary'); } catch(e){}
+                    try { startBtn.innerHTML = '▶ Connect'; } catch(e){}
+
+                    closeBtn.disabled = true;
+                    try { closeBtn.classList.remove('primary'); } catch(e){}
+                    try { closeBtn.classList.add('ghost'); } catch(e){}
+                    try { closeBtn.innerHTML = 'Disconnect'; } catch(e){}
                 }
-            }
+                // Enable or disable the send button depending on connection state
+                try {
+                    const send = $('submitmsg');
+                    if (send) send.disabled = !connected;
+                } catch (e) { console.warn('toggle send button', e); }
+                // always ensure connecting spinner is stopped when button state changes
+                try{
+                    // restore original button text if we set it when starting connection
+                    if(startBtn.dataset && startBtn.dataset.orig && !connected){ startBtn.innerHTML = startBtn.dataset.orig; delete startBtn.dataset.orig; }
+                }catch(e){}
+                // make channel-related inputs read-only/disabled while connected
+                try { setChannelFieldsReadOnly(connected); } catch(e) { console.warn('setChannelFieldsReadOnly', e); }
+            } catch (e) { console.warn(e); }
+        }
 
-            setTimeout(function () {
-                //another check, you don't know if some user connects before the user clicked on 'yes'
-                users = Object.keys(channel.connectedAgents);
-                lastOne = (users.length == 1);
-                channel.disconnect(function (res) {
-                    if (res.status == 'success') {
-                        uiDeactiveState();
-                        messagesCount = 0;
-
-                        // no need to continue from the last receive range
-                        if (lastOne) {
-                            delete channel._last_receive_range;
-                        }
-                    } else {
-                        alert(res.data);
+        // Toggle readOnly/disabled on channel input fields while connected
+        function setChannelFieldsReadOnly(readonly) {
+            try {
+                const ids = ['channelName','channelPassword','channelId','agentName','apiKey'];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    // Try to set readOnly first (works for inputs/textareas). If it throws or isn't supported, disable as a fallback.
+                    try {
+                        el.readOnly = !!readonly;
+                    } catch (e) {
+                        try { el.disabled = !!readonly; } catch (_) {}
                     }
                 });
-            }, 500);
-        });
+                 const chk = document.getElementById('useDefaultKey');
+                 if (chk) chk.disabled = !!readonly;
+             } catch (e) { console.warn('setChannelFieldsReadOnly failed', e); }
+         }
 
-        $('#clear').click(function () {
-
-            if ($('#app-container').html() && confirm('Are you sure to delete the chat conversation?')) {
-                $('#app-container').html('');
-            }
-        });
-
-        $('#clearmsg').click(function () {
-
-            if ($('#usermsg').val() && confirm('Are you sure to delete the chat text?')) {
-                $('#usermsg').val('');
-            }
-
-        });
-
-        $('#submitmsg').click(send);
-
-        $("#channelName,#channelPassword,#nickName").keypress(function (e) {
-            if (e.which == 13) {
-                //$('#usermsg').val()
-                e.preventDefault();
-                $('#start').click();
-            }
-        });
-
-        $("#usermsg").keypress(function (e) {
-            if (e.which == 13 && $('#press-enter input')[0].checked && !e.shiftKey) {
-                //$('#usermsg').val()
-                e.preventDefault();
-                send();
-            }
-        });
-
-        /**
-         * Do something for mobile devices
-         */
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-
-        }
-
-        channel = new HTTPChannel({usePubKey: false});
-
-        channel.onreset = function () {
-            alert('Something went wrong, your session will be disconnected.');
-            channel.disconnect();
-        }
-
-        channel.ondisconnect = uiDeactiveState;
-
-        channel.onconnect = function (e) {
-
-            console.log('onconnect:', e);
-
-            var response = e.response;
-
-            localStorage.lastSessionId = response.data.sessionId;
-
-            sending = false;
-            if (response.status == 'success') {
-
-                if (!notifier.enabled) {
-                    setTimeout(function () {
-                        notifier.enabled = true;
-                    }, 3000);
-                }
-
-                console.log('connected to session');
-                console.log(response.data);
-                uiActiveState();
-                updateAgentsCount();
-            } else {
-                alert(response.data);
-            }
-        }
-
-        channel.onmessage = function (e) {
-
-            var response = e.response;
-
-            if (response.status == 'success') {
-                if (response.data && response.data != null && response.data.length > 0) {
-
-                    console.log('Received data: ');
-                    console.log(response.data);
-
-                    for (var i = 0; i < response.data.length; i++) {
-                        var item = response.data[i];
-                        var date = new Date(item.date);
-                        if (item.type == 'chat-text') {
-                            addReceivedMessage({name: item.from, img: "images/other.png"}, item.content, date);
-                        } else if (item.type == 'connect') {
-                            notifier.show('New connection!', '<b>' + item.from + '</b> is connected.');
-                            updateAgentsCount();
-                            addConnectionEvent('User ' + item.from + ' is connected',
-                                '<span class="connection-event-connected"><b>' + item.from + '</b> is connected</span>',
-                                date);
-                        } else if (item.type == 'disconnect') {
-                            notifier.show('User disconnected!', '<b>' + item.from + '</b> is disconnected.');
-                            updateAgentsCount();
-                            addConnectionEvent('User ' + item.from + ' is disconnected',
-                                '<span class="connection-event-disconnected"><b>' + item.from + '</b> is disconnected</span>',
-                                date);
+        // Show/hide connecting spinner and temporarily change start button text
+        function setConnecting(on) {
+            try {
+                const startBtn = $('start');
+                if (!startBtn) return;
+                if (on) {
+                    try { startBtn.dataset.orig = startBtn.dataset.orig || startBtn.innerHTML; } catch (e) {}
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '<span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;margin-right:8px;vertical-align:middle;animation:spin 0.8s linear infinite"></span>Connecting...';
+                } else {
+                    try {
+                        if (startBtn.dataset && startBtn.dataset.orig) {
+                            startBtn.innerHTML = startBtn.dataset.orig;
+                            delete startBtn.dataset.orig;
+                        } else {
+                            startBtn.innerHTML = startBtn.innerHTML.replace(/<span class="spinner"[\s\S]*?<\/span>/, '').replace(/Connecting\.{3}/i, '').trim();
+                            if (!startBtn.innerHTML) startBtn.innerHTML = 'Connect';
                         }
+                    } catch (e) {
+                        try { startBtn.innerHTML = 'Connect'; } catch (e) {}
+                    }
+                    // leave enabled/disabled state to setButtonsConnected
+                }
+            } catch (e) { console.warn('setConnecting failed', e); }
+        }
+
+        // Replace simple alert with a rich modal popup showing connected agents
+        function getConnectedAgentsList() {
+            try {
+                const ch = window.channel || {};
+                // window.channel.connectedAgents might be many shapes: array, CSV string, object-map
+                if (Array.isArray(ch.connectedAgents)) return ch.connectedAgents.slice();
+                if (typeof ch.connectedAgents === 'string') return ch.connectedAgents.split(',').map(s => s.trim()).filter(Boolean);
+                if (ch._connectedAgentsMap && typeof ch._connectedAgentsMap === 'object') {
+                    return Object.keys(ch._connectedAgentsMap).map(k => {
+                        const info = ch._connectedAgentsMap[k];
+                        return (info && (info.name || info.agentName)) ? (info.name || info.agentName) : k;
+                    });
+                }
+                if (Array.isArray(ch._connectedAgents)) return ch._connectedAgents.slice();
+                // fallback to channel.connectedAgents when it's a non-array iterable
+                if (ch.connectedAgents && typeof ch.connectedAgents === 'object') return Object.values(ch.connectedAgents).map(v => (typeof v === 'string' ? v : (v && (v.name || v.agentName)) || '') ).filter(Boolean);
+                return [];
+            } catch (e) {
+                console.warn('getConnectedAgentsList', e);
+                return [];
+            }
+        }
+
+        function showAgentsModal(list) {
+            try {
+                const overlay = document.getElementById('agents-overlay');
+                const modal = document.getElementById('agents-modal');
+                const listEl = document.getElementById('agents-list');
+                const titleCount = document.getElementById('agents-title-count');
+                if (!overlay || !modal || !listEl) return;
+                listEl.innerHTML = '';
+                const agents = Array.isArray(list) ? list : [];
+                titleCount.textContent = agents.length;
+                if (!agents.length) {
+                    const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = 'No connected agents';
+                    listEl.appendChild(empty);
+                } else {
+                    agents.forEach(a => {
+                        const name = String(a || 'Unknown');
+                        const item = document.createElement('div'); item.className = 'agent-item';
+                        const avatar = document.createElement('div'); avatar.className = 'agent-avatar'; avatar.textContent = (name || 'U').charAt(0).toUpperCase();
+                        const meta = document.createElement('div'); meta.style.display = 'flex'; meta.style.flexDirection = 'column';
+                        const nm = document.createElement('div'); nm.className = 'agent-name'; nm.textContent = name;
+                        const m2 = document.createElement('div'); m2.className = 'agent-meta'; m2.textContent = 'online';
+                        meta.appendChild(nm); meta.appendChild(m2);
+                        item.appendChild(avatar); item.appendChild(meta);
+                        listEl.appendChild(item);
+                    });
+                }
+                overlay.style.display = 'block';
+                overlay.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'block';
+                modal.setAttribute('aria-hidden', 'false');
+                 // focus the modal for accessibility
+                 modal.setAttribute('tabindex', '-1');
+                 modal.focus();
+             } catch (e) { console.warn('showAgentsModal', e); }
+         }
+
+         function hideAgentsModal() {
+             try {
+                 const overlay = document.getElementById('agents-overlay');
+                 const modal = document.getElementById('agents-modal');
+                 if (overlay) { overlay.style.display = 'none'; overlay.setAttribute('aria-hidden', 'true'); }
+                 if (modal) { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); try { modal.removeAttribute('tabindex'); } catch(e){} }
+             } catch (e) { console.warn('hideAgentsModal', e); }
+         }
+
+         // copy agent list to clipboard
+         function copyAgentsToClipboard() {
+             try {
+                 const list = getConnectedAgentsList();
+                 const txt = list.join('\n') || '';
+                 if (!txt) { showToast('No agents to copy', 'error'); return; }
+                 navigator.clipboard.writeText(txt).then(() => showToast('Agent list copied', 'success')).catch(() => showToast('Copy failed', 'error'));
+             } catch (e) { console.warn('copyAgentsToClipboard', e); showToast('Copy failed', 'error'); }
+         }
+
+        // show modal when clicking the badge
+        $('agent-badge')?.addEventListener('click', function (ev) {
+            ev && ev.stopPropagation && ev.stopPropagation();
+            try {
+                const agents = getConnectedAgentsList();
+                showAgentsModal(agents);
+            } catch (e) { console.warn('agent-badge click', e); }
+        });
+
+        // overlay and modal close wiring
+        // Close modal when clicking overlay background
+        document.getElementById('agents-overlay')?.addEventListener('click', function (e) {
+            try { if (e.target === this) hideAgentsModal(); } catch(e){}
+        });
+
+        // Wire up modal close buttons
+        (function wireModalButtons(){
+            try {
+                const modal = document.getElementById('agents-modal');
+                if (!modal) return;
+                modal.addEventListener('click', function (e) {
+                    const close = e.target.closest && e.target.closest('.close-btn');
+                    if (close) { e.stopPropagation(); hideAgentsModal(); return; }
+                    const copy = e.target.closest && e.target.closest('.copy-btn');
+                    if (copy) { e.stopPropagation(); copyAgentsToClipboard(); return; }
+                });
+                // also close on Escape key
+                document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideAgentsModal(); });
+            } catch (e) { console.warn('wireModalButtons', e); }
+        })();
+
+        // expose copy function to the modal button via delegation
+        // (legacy) kept for compatibility; modern wiring above handles copy/close actions
+        document.getElementById('agents-modal')?.addEventListener('click', function (e) {
+            const el = e.target && e.target.closest && e.target.closest('.copy-btn');
+            if (el) {
+                copyAgentsToClipboard();
+                e.stopPropagation();
+            }
+        });
+
+        // Connect timeout handle (cleared when connect succeeds)
+        let __connectTimeout = null;
+        // Note: polling removed. Agent list is updated from channel.connectedAgents and connect/disconnect events.
+
+         // message listener helper
+        function attachChannelMessageListener() {
+             try {
+                 if (!window.channel || typeof window.channel.addEventListener !== 'function') return;
+                 // avoid double attaching by setting a flag
+                 if (window.channel.__webAgentListenersAttached) return;
+                 window.channel.__webAgentListenersAttached = true;
+
+                window.channel.addEventListener('message', function (ev) {
+                    try {
+                        const res = getApiResponse(ev) || null;
+                        console.debug('web-agent message event', res, ev);
+                        // if server responded with an error (e.g. invalid api key) stop connecting UI
+                        if(res && String(res.status).toLowerCase() === 'error'){
+                            const msg = res.statusMessage || (res.data && (res.data.message || res.data.statusMessage)) || 'Server error';
+                            // show both a toast and a visible system notice in the chat pane
+                            showToast(msg, 'error');
+                            try{ appendSystemNotification(msg, 'error'); }catch(e){}
+                            try{ setConnecting(false); }catch(e){}
+                            try{ setButtonsConnected(false); }catch(e){}
+                            // If channel exists, disconnect it to clean up
+                            try{ if(window.channel && typeof window.channel.disconnect === 'function') window.channel.disconnect(); }catch(e){}
+                            return;
+                        }
+                        const items = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                        items.forEach(it => {
+                            if (!it) return;
+                            // detect agent connect/disconnect events (be permissive about field names)
+                            const evType = it.type || it.event || it.action || (it.data && it.data.type) || null;
+                            const agentName = (it.agentName || it.name || it.from || (it.data && it.data.agentName) || '').trim();
+
+                            if(it.date > window.channel.connectTime && evType){
+                                const t = String(evType).toLowerCase();
+                                if(t === 'connect'){
+                                    appendSystemNotification('Agent ' + (agentName || 'Unknown') + ' is online', 'success');
+                                    setAgentCount(getConnectedAgentsFromChannel());
+                                    return;
+                                }
+                                if(t === 'disconnect'){
+                                    appendSystemNotification('Agent ' + (agentName || 'Unknown') + ' is offline', 'info');
+                                    setAgentCount(getConnectedAgentsFromChannel());
+                                    return;
+                                }
+                            }
+
+                            if (it.type === 'chat-text')
+                            {
+                                const isMe = window.channel && window.channel._agentName && it.from === window.channel._agentName;
+                                const messageText = it.encrypted ? '🔒 Encrypted: content' : (it.content || '(None)');
+                                appendMessage(it.from || agentName || 'Unknown', messageText, isMe, it.date || Date.now());
+                            }
+                        });
+                    } catch (e) { console.warn('message handler', e); }
+                });
+
+                window.channel.addEventListener('connect', function (ev) {
+                    const resp = getApiResponse(ev) || null;
+                    console.debug('web-agent connect event', resp, ev);
+                    // handle server-side errors returned on connect
+                    if(resp && String(resp.status).toLowerCase() === 'error'){
+                        const msg = resp.statusMessage || resp.data || 'Connect error';
+                        // show both a toast and a visible system notice in the chat pane
+                        showToast(msg, 'error');
+                        try{ appendSystemNotification(msg, 'error'); }catch(e){}
+                        try{ setConnecting(false); }catch(e){}
+                        try{ setButtonsConnected(false); }catch(e){}
+                        return;
+                    }
+                    // if connect succeeded but server included a statusMessage, display it as a system notice
+                    if(resp && String(resp.status).toLowerCase() === 'success' && resp.statusMessage){
+                        try{ appendSystemNotification(resp.statusMessage, 'success'); }catch(e){}
+                    }
+                    window.lastApiResponse = resp;
+                    // stop spinner on successful connect
+                    setConnecting(false);
+                    if(__connectTimeout){ clearTimeout(__connectTimeout); __connectTimeout = null; }
+
+                    // save sessionId from server response (if present) so next connect can reuse it
+                    const sid = resp?.data?.sessionId || resp?.sessionId || null;
+                    if (sid) {
+                        try { localStorage.setItem('lastSessionId', sid); } catch(e) {}
                     }
 
+                    const chName = document.getElementById('channelName')?.value?.trim() || '';
+                    const chPass = document.getElementById('channelPassword')?.value?.trim() || '';
+                    const chId = document.getElementById('channelId')?.value?.trim() || '';
+                    const agent = document.getElementById('agentName')?.value?.trim() || '';
+                    localStorage.setItem('lastChannelName', chName);
+                    localStorage.setItem('lastChannelPassword', chPass);
+                    localStorage.setItem('lastChannelId', chId);
+                    localStorage.setItem('lastAgentName', agent);
+
+                    setButtonsConnected(true);
+                    // sync agent list/count from runtime channel object (authoritative)
+                    setAgentCount(getConnectedAgentsFromChannel());
+                    try { refreshAgentsModalIfOpen(); } catch(e){}
+                    updateChannelDisplay(ev);
+                    // Show a persistent system notice inside chat indicating successful connection
+                    const cid = (resp && resp.data && resp.data.channelId) ? resp.data.channelId : (document.getElementById('channel-text')?.textContent || '—');
+                    const agentName = (window.channel && window.channel._agentName) ? window.channel._agentName : (document.getElementById('agentName')?.value || 'web-agent');
+                    appendSystemNotification('Connected as ' + agentName + ' to channel ' + cid, 'success');           showToast('Connected', 'success');
+                 });
+
+                window.channel.addEventListener('disconnect', function (ev) {
+                    setButtonsConnected(false);
+                    showToast('Disconnected', 'info');
+                    // reset agent count on disconnect
+                    setAgentCount(0);
+                    try { refreshAgentsModalIfOpen(); } catch(e){}
+                });
+
+            } catch (e) { console.warn('attachChannelMessageListener failed', e); }
+         }
+
+         // Connect / Disconnect actions
+        async function doConnect() {
+             const startBtn = $('start');
+             setConnecting(true);
+            try {
+                const api = window.messagingApiUrl || '/';
+                let apiKey = ($('apiKey')?.value || '').trim();
+                // if API key is not provided by the user, fall back to the defaultKey
+                if(!apiKey){ apiKey = defaultKey; }
+                const mode = (document.getElementById('channelMode')?.value || 'params');
+                const channelId = ($('channelId')?.value || '').trim();
+                const channelName = ($('channelName')?.value || '').trim();
+                const channelPassword = ($('channelPassword')?.value || '').trim();
+                 const agentNameEl = $('agentName');
+                 const agentName = (agentNameEl?.value || '').trim() || 'web-agent';
+                 // If the input was empty, populate it with the actual agent name that will be used
+                 try { if (agentNameEl && !agentNameEl.value.trim()) agentNameEl.value = agentName; } catch(e){}
+
+
+                if (typeof window.HTTPChannel !== 'function') {
+                    showToast('Client library HTTPChannel not available', 'error');
+                    setConnecting(false);
+                    return;
                 }
-            } else {
-                console.log('Rreceive error: ');
-                console.log(response);
+
+                // disconnect previous
+                try { if (window.channel && typeof window.channel.disconnect === 'function') window.channel.disconnect(); } catch (e) { console.warn(e); }
+
+                const ch = new HTTPChannel({ usePubKey: false });
+                window.channel = ch;
+                ch._api = api;
+                if (apiKey) ch._apiKey = apiKey;
+                ch._agentName = agentName;
+
+                attachChannelMessageListener();
+
+                const cfg = { api: api, apiKey: apiKey, user: agentName, autoReceive: true };
+                // Respect selected mode: when 'id' is selected use channelId, otherwise use name/password
+                if (mode === 'id') {
+                    if (!channelId) {
+                        showToast('Channel ID is required when connecting by ID', 'error');
+                        setConnecting(false);
+                        return;
+                    }
+                    cfg.channelId = channelId;
+                } else {
+                    if (!channelName) {
+                        showToast('Channel name is required', 'error');
+                        setConnecting(false);
+                        return;
+                    }
+                    cfg.channelName = channelName;
+                    cfg.channelPassword = channelPassword;
+                }
+
+                 // include stored sessionId if available
+                 try {
+                     const storedSession = localStorage.getItem('lastSessionId');
+                     if (storedSession) cfg.sessionId = storedSession;
+                 } catch (e) { console.warn('read sessionId', e); }
+
+                try {
+                    // persist selected mode so UI restores it next time
+                    try { localStorage.setItem('lastChannelMode', mode); } catch(e) {}
+                    ch.connect(cfg);
+                     // start a connect timeout to avoid stuck spinner if no response
+                     try{ if(__connectTimeout) clearTimeout(__connectTimeout); }catch(e){}
+                     __connectTimeout = setTimeout(function(){
+                         showToast('Connect timeout', 'error');
+                         setConnecting(false);
+                         setButtonsConnected(false);
+                         if(window.channel && typeof window.channel.disconnect === 'function') window.channel.disconnect();
+                     }, 15000);
+                } catch (err) {
+                    console.error('ch.connect threw', err);
+                    showToast('Connect failed: ' + (err?.message || err), 'error');
+                    setConnecting(false);
+                }
+
+            } catch (err) {
+                console.error('doConnect error', err);
+                showToast('Connect error: ' + (err?.message || err), 'error');
+                setConnecting(false);
             }
         }
 
+        function doDisconnect() {
+            try {
+                if (window.channel && typeof window.channel.disconnect === 'function') {
+                    window.channel.disconnect();
+                }
+            } catch (e) { console.warn(e); }
+            setButtonsConnected(false);
+            setAgentCount(0);
+         }
 
-        if (invitation) {
-            $('#start').click();
-        } else if (hash.auth) {
-            var authInfo = channel.decodeAuth(hash.auth);
-            $('#channelName').val(authInfo.channelName);
-            $('#channelPassword').val(authInfo.channelKey);
-
-            if (hash.connect) {
-                $('#start').click();
-            }
-
-        } else {
-
-            loadInputDomVal($('#channelName')[0], 'channelName', '', true, false);
-            loadInputDomVal($('#channelPassword')[0], 'channelPassword', '', true, true);
-            loadInputDomVal($('#nickName')[0], 'nickName', '', true, false);
+         // Clear messages
+       function doClear() {
+            if (!confirm('Clear all messages from the chat window?')) return;
+            const container = document.querySelector('.chat-body');
+            if(container) container.innerHTML = '';
+            showToast('Messages cleared', 'success');
         }
 
-    });
-
-    function onMessageEvent(message) {
-        message = emojify.replace(message);
-        message = message.replace(/\n/gi, '<br/>');
-        messagesCount++;
-        return message;
-    }
-
-    function addConnectionEvent(title, message, date) {
-
-
-        var title = 'title="' + title + " at " + date.toLocaleString() + '"';
-        var el = '<div class="connection-event" ' + title + ' ><div class="connection-event-line"></div><div class="connection-event-text">' + message + '</div></div>';
-
-        $('#app-container').append(el);
-
-        setTimeout(function () {
-            $("#app-container")[0].scrollTop = $("#app-container")[0].scrollHeight;
-        }, 200);
-
-    }
-
-    function sameMinute(d1, d2) {
-        return (Math.abs(d1 - d2) / 1000) < 60 && d1.getMinutes() == d2.getMinutes();
-    }
-
-    function formatTime(date) {
-
-        var hours = date.getHours();
-        var mins = date.getMinutes() + '';
-        var mode = 'AM';
-
-        if (hours >= 12) {
-            hours = (hours - 12) + '';
-            mode = 'PM';
+        // Robustly extract connected agent names from runtime channel
+        function getConnectedAgentsFromChannel() {
+            return Object.keys(window.channel._connectedAgentsMap || []);
         }
 
-        hours = hours.length < 2 ? ('0' + hours) : hours;
-        mins = mins.length < 2 ? ('0' + mins) : mins;
+        // Wire up Connect / Disconnect / Clear buttons (minimal: single property checks)
+        try {
+            if ($('start')) $('start').addEventListener('click', doConnect);
+            if ($('close')) $('close').addEventListener('click', doDisconnect);
+            if ($('clear')) $('clear').addEventListener('click', doClear);
+        } catch (e) { console.warn('button wiring failed', e); }
 
-        return hours + ':' + mins + ' ' + mode;
-    }
+        // initial dummy message (system notice)
+        appendMessage('System', 'Welcome to the Messaging Platform web agent interface. Please connect to a channel to begin.', false, Date.now());
 
-    function addSentMessage(user, message, date) {
+        // detect if running in standalone mode (not behind gateway)
+        (function detectStandalone() {
+            try {
+                // if the default API key is present, we assume standalone mode
+                const isStandalone = !!(window.__DEFAULT_API_KEY && window.__DEFAULT_API_KEY.trim());
+                if (isStandalone) {
+                    const apiKeyEl = $('apiKey');
+                    if (apiKeyEl) {
+                        apiKeyEl.value = window.__DEFAULT_API_KEY.trim();
+                        // also enable the default key checkbox
+                        const chk = $('useDefaultKey');
+                        if (chk) {
+                            chk.checked = true;
+                            chk.disabled = true; // disable toggling in standalone mode
+                        }
+                    }
+                    // hide the agent name field in standalone mode
+                    const agentNameRow = document.getElementById('agent-name-row');
+                    if (agentNameRow) agentNameRow.style.display = 'none';
+                }
+            } catch (e) { console.warn('detectStandalone', e); }
+        })();
 
-        message = onMessageEvent(message);
-
-        if (last.type == 'sent' && last.user.name == user.name && sameMinute(date, last.date)) {
-            last.el.append('<br/>' + message);
-        } else {
-
-            var title = 'title="' + date.toLocaleString() + '"';
-            var el = $('<div class="right-side-container"><div class="message-user" style="display:none;">' + user.name + '</div><div class="user" style="float : right;" title="' + user.name + '"><img src="' + user.img + '"/></div><div class="side-message right-side-message" ' + title + '>'
-                + '<div class="chat-message">' + message + '</div>' + '<div class="msg-time">' + formatTime(date) + '</div>'
-                + '</div></div>');
-
-            last.el = el.find('.chat-message');
-
-            $('#app-container').append(el);
-        }
-
-        $('#usermsg').val('');
-        last.type = 'sent';
-        last.date = date;
-        last.user = user;
-
-        setTimeout(function () {
-            $("#app-container")[0].scrollTop = $("#app-container")[0].scrollHeight;
-        }, 200);
-    }
-
-    function addReceivedMessage(user, message, date) {
-
-        message = onMessageEvent(message);
-
-        if (last.type == 'received' && last.user.name == user.name && sameMinute(date, last.date)) {
-            last.el.append('<br/>' + message);
-        } else {
-
-            var title = 'title="' + date.toLocaleString() + '"';
-            var el = $('<div class="left-side-container"><div class="user" style="float : left;" title="' + user.name + '"><img src="' + user.img + '"/></div><div class="side-message left-side-message" ' + title + '>'
-                + '<div class="message-user">' + user.name + '</div><div class="chat-message">' + message + '</div>' + '<div class="msg-time">' + formatTime(date) + '</div>'
-                + '</div></div>');
-
-            last.el = el.find('.chat-message');
-            $('#app-container').append(el);
-
-        }
-
-        last.type = 'received';
-        last.date = date;
-        last.user = user;
-
-        setTimeout(function () {
-            $("#app-container")[0].scrollTop = $("#app-container")[0].scrollHeight;
-        }, 200);
-
-        notifier.playAudio();
-    }
-
-    function encodeInvitationUrl(email) {
-        var invitation = $('#channelName').val() + '\n' + $('#channelPassword').val() + '\n' + email;
-        return location.origin + location.pathname + '#invitation_' + MySecurity.encrypt(invitation, email);//+'#email='+MySecurity.encrypt(email,'email');
-    }
-
-    function decodeInvitationUrl(email, hash) {
-        var authCipher = parseHashParameters(hash).invitation.substring(3);
-        console.log('authCipher = ' + authCipher);
-        var invitation_ = MySecurity.decrypt(authCipher, email);
-        if (!invitation_ || invitation_ == null) {
-            return null;
-        }
-
-        return {
-            channelName: invitation_.split('\n')[0],
-            channelPassword: invitation_.split('\n')[1],
-            nickName: invitation_.split('\n')[2]
-        }
-    }
-
-
-    function S4() {
-        return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
-    }
-
-    function guid() {
-        return (S4() + S4() + S4() + S4().substr(0, 3) + S4() + S4() + S4() + S4()).toLowerCase()
-    }
-
-    /*window.onbeforeunload = function(){
-        if(channel.readyState){
-            return 'Channel will be disconnected?';
-        }
-    }*/
-
-
+    })();
 </script>
-
-
 </body>
-
 </html>

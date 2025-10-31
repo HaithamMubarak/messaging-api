@@ -1,24 +1,35 @@
 from abc import ABC, abstractmethod
-from hmdev.messaging.agent.util.api_response import ApiResponse
+from typing import List, Optional
+
+from hmdev.messaging.agent.api.models import ConnectResponse, EventMessageResult, AgentInfo, ReceiveConfig
 
 
 class ConnectionChannelApi(ABC):
     @abstractmethod
-    def connect(self, channel_name: str, channel_key: str, agent_name: str, session_id: str | None = None) -> ApiResponse:
+    def connect(self, channel_name: str, channel_key: str, agent_name: str, session_id: str | None = None) -> ConnectResponse:
         ...
 
     @abstractmethod
-    def receive(self, session: str, range_str: str) -> ApiResponse:
+    def receive(self, session_id: str, receive_config: ReceiveConfig) -> Optional[EventMessageResult]:
         ...
 
     @abstractmethod
-    def get_active_agents(self, session: str) -> ApiResponse:
+    def get_active_agents(self, session_id: str) -> Optional[List[AgentInfo]]:
         ...
 
     @abstractmethod
-    def send(self, msg: str, to_user: str | None, session: str) -> ApiResponse:
+    def send(self, msg: str, to_user: str | None, session_id: str) -> bool:
         ...
 
     @abstractmethod
-    def disconnect(self, channel_key: str, session: str) -> ApiResponse:
+    def disconnect(self, session_id: str) -> bool:
+        ...
+
+    # UDP bridge operations via the kafka-service UDP listener
+    @abstractmethod
+    def udp_push(self, msg: str, to_user: str | None, session_id: str) -> bool:
+        ...
+
+    @abstractmethod
+    def udp_pull(self, session_id: str, receive_config: ReceiveConfig) -> Optional[EventMessageResult]:
         ...

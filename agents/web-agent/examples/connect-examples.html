@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Web Agent — Connect Examples</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .block { margin-bottom: 18px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
+    label { display:block; margin-bottom:6px }
+    input { width: 100%; padding:8px; box-sizing: border-box }
+    button { margin-top:8px }
+    pre { background:#f6f8fa; padding:12px; border-radius:6px; max-height:200px; overflow:auto }
+  </style>
+</head>
+<body>
+  <h1>Web Agent — Connect Examples</h1>
+  <p>Shows three ways to connect: channelName+password, channelName+apiKey, and channelId+apiKey.</p>
+
+  <div class="block">
+    <h3>Connection settings</h3>
+    <label>API base (e.g. /api/)</label>
+    <input id="api" value="/api/" />
+    <label>User / agent name</label>
+    <input id="user" value="web-user" />
+  </div>
+
+  <div class="block">
+    <h3>1) Connect using channelName + password</h3>
+    <label>Channel name</label>
+    <input id="c1_name" value="my-channel" />
+    <label>Channel password</label>
+    <input id="c1_password" value="secret" />
+    <button id="btn1">Connect (password)</button>
+  </div>
+
+  <div class="block">
+    <h3>2) Connect using channelName + API key</h3>
+    <label>Channel name</label>
+    <input id="c2_name" value="my-channel" />
+    <label>API key</label>
+    <input id="c2_apikey" placeholder="API key" />
+    <label>API key header name (optional)</label>
+    <input id="c2_apikey_header" placeholder="X-API-Key" />
+    <button id="btn2">Connect (apiKey)</button>
+  </div>
+
+  <div class="block">
+    <h3>3) Connect using channelId + API key</h3>
+    <label>Channel Id</label>
+    <input id="c3_id" placeholder="channel-..." />
+    <label>API key</label>
+    <input id="c3_apikey" placeholder="API key" />
+    <button id="btn3">Connect (channelId)</button>
+  </div>
+
+  <div class="block">
+    <h3>Log</h3>
+    <pre id="log">Open the devtools console and watch events; this log mirrors connect events.</pre>
+  </div>
+
+  <script src="js/web-agent.js"></script>
+  <script>
+    function log(msg){
+      var p = document.getElementById('log');
+      p.textContent = new Date().toISOString() + ' - ' + msg + '\n' + p.textContent;
+      console.log(msg);
+    }
+
+    function makeChannel(){
+      var ch = new HTTPChannel({usePubKey: true});
+      ch.addEventListener('connect', function(e){
+        log('connect event: ' + JSON.stringify(e.response));
+      });
+      ch.addEventListener('message', function(e){
+        log('message event: ' + JSON.stringify(e.response));
+      });
+      ch.addEventListener('disconnect', function(e){
+        log('disconnect event: ' + JSON.stringify(e.response));
+      });
+      return ch;
+    }
+
+    document.getElementById('btn1').addEventListener('click', function(){
+      var api = document.getElementById('api').value;
+      var user = document.getElementById('user').value;
+      var ch = makeChannel();
+      ch.connect({ api: api, channelName: document.getElementById('c1_name').value, channelPassword: document.getElementById('c1_password').value, user: user, autoReceive: true });
+      log('attempting connect (password)');
+    });
+
+    document.getElementById('btn2').addEventListener('click', function(){
+      var api = document.getElementById('api').value;
+      var user = document.getElementById('user').value;
+      var ch = makeChannel();
+      var header = document.getElementById('c2_apikey_header').value || undefined;
+      ch.connect({ api: api, channelName: document.getElementById('c2_name').value, apiKey: document.getElementById('c2_apikey').value, apiKeyHeaderName: header, user: user, autoReceive: true });
+      log('attempting connect (apiKey)');
+    });
+
+    document.getElementById('btn3').addEventListener('click', function(){
+      var api = document.getElementById('api').value;
+      var user = document.getElementById('user').value;
+      var ch = makeChannel();
+      ch.connect({ api: api, channelId: document.getElementById('c3_id').value, apiKey: document.getElementById('c3_apikey').value, user: user, autoReceive: true });
+      log('attempting connect (channelId)');
+    });
+  </script>
+</body>
+</html>

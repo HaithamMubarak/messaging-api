@@ -1,0 +1,82 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '2.7.18'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.hmdev.messaging.service.kafka'
+version = '0.0.1-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Add JPA + Postgres support for developer/accounts and channel metadata
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.postgresql:postgresql:42.6.0'
+    implementation 'org.flywaydb:flyway-core'
+    // Ensure persistence API available for static analysis
+    implementation 'javax.persistence:javax.persistence-api:2.2'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    implementation project(":messaging-common")
+
+    // Lombok must be declared here too (Gradle does NOT propagate processors)
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+    // Spring Security for admin endpoints
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Use testImplementation for testing libraries
+    testImplementation 'org.testng:testng:7.8.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+springBoot {
+    mainClass = 'com.hmdev.messaging.service.Application'
+}
+
+// Define source and target paths
+def webAgentDir = "${rootDir}/agents/web-agent"
+def staticTargetDir = "${projectDir}/src/main/resources/generated/web-agent"
+
+// Task to copy web-agent files except build/dist
+tasks.register('copyWebAgentFiles', Copy) {
+    description = "Copies all files from web-agent into messaging-service static/ except build or dist folders."
+    group = "build"
+
+    from(webAgentDir) {
+        exclude 'build/**'
+        exclude 'dist/**'
+        exclude '.git/**'
+        exclude 'node_modules/**'
+    }
+    into(staticTargetDir)
+
+    // Inject messagingApiUrl into init-agent.js
+    filesMatching("**/init-agent.js") {
+        filter { line ->
+            line.replaceAll(/window\.messagingApiUrl\s*=\s*['"].*?['"];\s*/, "window.messagingApiUrl = '/messaging-platform/api/v1/messaging-service';")
+        }
+    }
+
+    doFirst {
+        println "Copying web-agent files from ${webAgentDir} to ${staticTargetDir}"
+    }
+}
+
+// Copy files in pre-packaging phase
+tasks.named('processResources') {
+    dependsOn 'copyWebAgentFiles'
+}

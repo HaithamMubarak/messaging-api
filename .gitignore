@@ -1,5 +1,9 @@
 .gradle
 .idea
+build
+logs
 /build/
 agents/java-agent/build
 **/__pycache__/
+services/messaging-service/src/main/resources/generated/web-agent/*
+

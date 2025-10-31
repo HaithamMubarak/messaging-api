@@ -1,0 +1,25 @@
+<h2>Channels</h2>
+<div class="controls">
+  <input id="filter" placeholder="Filter channel id..." />
+  <button id="refresh" class="btn">Refresh</button>
+</div>
+<table class="table" id="channelsTable">
+  <thead><tr><th>Channel ID</th><th>Event Count</th><th>Actions</th></tr></thead>
+  <tbody></tbody>
+</table>
+<div class="pagination" id="pagination"></div>
+<div id="channelDetail" class="pane"></div>
+
+<div class="acl-editor" id="aclEditor" style="display:none">
+  <h3>ACL Editor</h3>
+  <label>Public Channel: <input type="checkbox" id="aclPublic" /></label>
+  <label>Add reserved agent name: <input type="text" id="aclAddName" /> <button id="aclAddBtn" class="btn">Add</button></label>
+  <div class="reserved-list" id="reservedList"></div>
+  <div style="margin-top:8px"><button id="aclSave" class="btn">Save ACL</button> <button id="aclCancel" class="btn">Close</button></div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+  // channels UI script loaded separately
+</script>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Messaging Platform — Admin Console</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Admin Console</h1>
+      <div class="auth">
+        <label>API Key: <input id="adminKey" placeholder="API Key (developer or admin)" /></label>
+        <button id="saveKey">Save</button>
+      </div>
+    </header>
+
+    <nav>
+      <a href="./pages/channels.html">Channels</a>
+      <a href="./pages/agents.html">Agents</a>
+      <a href="./pages/sessions.html">Sessions</a>
+      <a href="./pages/cache.html">Cache</a>
+      <a href="./pages/audit.html">Audit</a>
+    </nav>
+
+    <main id="main">
+      <h2>Welcome</h2>
+      <p>Use the navigation to inspect channels, sessions, agents and cache related to the API key you provide above.</p>
+      <p>Note: this console calls server endpoints under <code>/messaging-platform/api/v1/messaging-service/admin</code> and requires an admin key or a developer API key with appropriate role.</p>
+    </main>
+
+    <footer>
+      <small>Admin Console — Messaging Platform</small>
+    </footer>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>

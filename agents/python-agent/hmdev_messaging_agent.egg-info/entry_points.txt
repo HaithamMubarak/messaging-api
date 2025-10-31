@@ -1,0 +1,2 @@
+[console_scripts]
+hmdev-agent = hmdev.messaging.agent:main

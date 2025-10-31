@@ -1,0 +1,19 @@
+plugins {
+    id 'application'
+}
+
+description = 'Java Agent Example - demonstrates chat usage via AgentConnection'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(":messaging-common")
+    implementation project(":agents:java-agent")
+}
+
+application {
+    mainClass = 'com.hmdev.messaging.agent.example.ExampleMain'
+}
+
