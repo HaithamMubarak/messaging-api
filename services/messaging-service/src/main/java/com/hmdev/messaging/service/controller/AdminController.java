@@ -245,6 +245,15 @@ public class AdminController {
         return JsonResponse.success("OK");
     }
 
+    @GetMapping(path = "/audit")
+    public JsonResponse audit(@RequestParam(name = "limit", required = false) Integer limit,
+                              @RequestHeader Map<String, String> headers) {
+        // Require admin role to view audit entries
+        checkDeveloper(headers, true);
+        // Audit functionality is deprecated/disabled; return empty list by default
+        return JsonResponse.success(Collections.emptyList());
+    }
+
     @ExceptionHandler(Exception.class)
     public JsonResponse handleControllerError(Exception exception) {
         LOGGER.error("AdminController error:", exception);

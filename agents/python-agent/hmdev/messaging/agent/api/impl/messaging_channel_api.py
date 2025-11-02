@@ -67,7 +67,7 @@ class MessagingChannelApi(ConnectionChannelApi):
         self._udp_client = UdpClient(host, self._udp_port)
 
     def _url(self, action: str) -> str:
-        # Align exactly with kafka-service controller paths
+        # Align exactly with messaging-service controller paths
         return f"/{action}"
 
     def is_channel_ready(self) -> bool:
@@ -329,7 +329,7 @@ class MessagingChannelApi(ConnectionChannelApi):
             if resp is None:
                 logger.debug("No UDP response received for udp_pull (timeout)")
                 return result
-            # kafka-service UDP response: { status: "ok", result: { status: "success", data: {...} } }
+            # messaging-service UDP response: { status: "ok", result: { status: "success", data: {...} } }
             if isinstance(resp, dict) and resp.get('status') == 'ok':
                 result_node = resp.get('result')
                 if isinstance(result_node, dict) and result_node.get('status') == 'success':

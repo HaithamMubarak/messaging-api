@@ -258,7 +258,7 @@ public class MessagingChannelApi implements ConnectionChannelApi {
     }
 
     private String getActionUrl(String action) {
-        // Align exactly with kafka-service controller URLs
+        // Align exactly with messaging-service controller URLs
         return String.format("/%s", action);
     }
 

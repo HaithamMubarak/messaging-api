@@ -25,7 +25,7 @@ class ConnectionChannelApi(ABC):
     def disconnect(self, session_id: str) -> bool:
         ...
 
-    # UDP bridge operations via the kafka-service UDP listener
+    # UDP bridge operations via the messaging-service UDP listener
     @abstractmethod
     def udp_push(self, msg: str, to_user: str | None, session_id: str) -> bool:
         ...

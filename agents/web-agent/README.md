@@ -20,4 +20,4 @@ It allows testing and quick interaction with channels directly from HTML/JS.
 ## Example
 - Agent1 opens the web client, joins `channelX` with password `secret`.  
 - Agent2 (web/Java/Python) joins the same channel with same credentials.  
-- They can now exchange encrypted messages via the **origin-service**.
+- They can now exchange encrypted messages via the **messaging-service**.

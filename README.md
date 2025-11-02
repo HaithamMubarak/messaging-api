@@ -1,7 +1,7 @@
 # Demo - Messaging API
 
 
-> Note: the previous `origin-service` content has been moved to the branch `demo/origin-service-structure`.
+> Note: the previous `origin-service` content has been moved to the branch `demo/origin-service-structure` and is deprecated (removed from the `main` branch).
 
 
 The **Messaging API** is a lightweight, agent-driven messaging platform enabling secure peer-to-peer communication through a relay service.  

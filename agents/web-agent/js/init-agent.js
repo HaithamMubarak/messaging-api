@@ -7,4 +7,4 @@ document.title = "HTTP Channel API"
 document.write(`<script src="./js/web-agent.bundle.js"></script>`);
 //document.write(`<script src="./rtcpeerconnection.web-agentweb-agent.bundle.js"></script>`);
 
-window.messagingApiUrl = '/messaging-api/origin-service';
+window.messagingApiUrl = '/messaging-platform/api/v1/messaging-service';

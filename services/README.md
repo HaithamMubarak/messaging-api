@@ -43,14 +43,12 @@ Runtime configuration lives in:
 - `services/messaging-service/src/main/resources/application.properties`
 
 Key areas
-- `spring.redis.*` and `spring.session.*` for Redis-backed session/cache.
 - `messaging.cache.*` properties (constructor-bound via `CacheProperties`).
 - `udp.listener.port` for the UDP bridge.
 
 Notes
 - Agents default base URL: `http://localhost:8080/messaging-platform/api/v1/messaging-service`.
 - Web Agent resources are copied into the service on build and served from classpath.
-- The service integrates with Redis for sessions and includes scaffolding for Kafka-based behavior.
 
 Troubleshooting & tips
 - If you need to run the service in Docker, use the `docker/` compose stack (see `docker/README.md`).
