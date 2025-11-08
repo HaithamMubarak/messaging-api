@@ -1,13 +1,8 @@
 package com.hmdev.messaging.service;
 
-import com.hmdev.messaging.common.security.MySecurity;
-import com.hmdev.messaging.common.service.EventMessageService;
-import com.hmdev.messaging.service.data.model.Channel;
-import com.hmdev.messaging.service.exception.ChannelLimitExceededException;
 import com.hmdev.messaging.service.data.model.Developer;
 import com.hmdev.messaging.service.repo.DeveloperRepository;
 import com.hmdev.messaging.service.service.ApiKeyService;
-import com.hmdev.messaging.service.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,7 +20,6 @@ public class DataInitializer implements ApplicationRunner {
 
     private final DeveloperRepository developerRepository;
     private final ApiKeyService apiKeyService;
-    private final EventMessageService<Channel> messageService;
 
     // Configuration properties (can be set in application.properties or via environment variables)
     @Value("${messaging.init.admin.email:${ADMIN_EMAIL:admin@local.com}}")
@@ -37,17 +31,9 @@ public class DataInitializer implements ApplicationRunner {
     @Value("${messaging.init.admin.keyId:${DEFAULT_API_KEY:c9b1c8f2-3a5b-4f2a-8d2b-1234567890ab}}")
     private String adminKeyId;
 
-    @Value("${messaging.init.default.channelName:default}")
-    private String defaultChannelName;
-
-    @Value("${messaging.init.default.channelPassword:default}")
-    private String defaultChannelPassword;
-
-    public DataInitializer(DeveloperRepository developerRepository, ApiKeyService apiKeyService,
-                           EventMessageService<Channel> messageService) {
+    public DataInitializer(DeveloperRepository developerRepository, ApiKeyService apiKeyService) {
         this.developerRepository = developerRepository;
         this.apiKeyService = apiKeyService;
-        this.messageService = messageService;
     }
 
     @Override
@@ -97,35 +83,11 @@ public class DataInitializer implements ApplicationRunner {
             ApiKeyService.CreatedKey createdKey = apiKeyService.createDeterministicKey(admin, adminKeyId, "default-key-for-admin");
             final String adminKeyIdStr = createdKey.getKeyId();
 
-            // Create default channel using configured name/password and derive channel id deterministically
-            // Derive channel id using the same algorithm used by controller: deriveChannelSecret(devApiKey + ":" + name, password)
-            String channelSecret = MySecurity.deriveChannelSecret(defaultChannelName, defaultChannelPassword);
-            String passwordHash = MySecurity.hash(defaultChannelPassword, channelSecret);
-            String channelId = Utils.createChannelId(defaultChannelName, passwordHash, adminKeyIdStr);
-
-            try {
-                messageService.createChannel(channelId, adminKeyId.toString(), defaultChannelName, passwordHash);
-                log.warn("Created/ensured default channel '{}' with channelId={}", defaultChannelName, channelId);
-            } catch (ChannelLimitExceededException cle) {
-                log.warn("Unable to create default channel for {}: {}", admin.getEmail(), cle.getMessage());
-            } catch (Exception ex) {
-                log.warn("Failed to create default channel: {}", ex.getMessage());
-            }
+            log.info("Default API key for admin developer {}: keyId={}",
+                    adminEmail, adminKeyIdStr);
 
         } catch (Exception e) {
             log.warn("Skipping DB seed - database unavailable or migration not run yet: {}", e.getMessage());
         }
-    }
-
-    public static void main(String[] args) {
-        String defaultChannelName = "default";
-        String defaultChannelPassword = "default";
-        String adminKeyIdProperty = "c9b1c8f2-3a5b-4f2a-8d2b-1234567890ab";
-        String channelSecret = MySecurity.deriveChannelSecret(defaultChannelName, defaultChannelPassword);
-        String passwordHash = MySecurity.hash(defaultChannelPassword, channelSecret);
-        String channelId = Utils.createChannelId(defaultChannelName, passwordHash, adminKeyIdProperty);
-        System.out.println(passwordHash);
-        System.out.println(channelSecret);
-
     }
 }
