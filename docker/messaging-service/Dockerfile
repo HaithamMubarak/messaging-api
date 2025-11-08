@@ -1,5 +1,5 @@
 # Expects the Spring Boot jar and build resources to be present under build/ within the service folder
-FROM openjdk:11-jdk-slim
+FROM openjdk:11.0.16-jdk
 
 WORKDIR /app
 
@@ -24,3 +24,4 @@ EXPOSE 8080 8082
 ENV JAVA_OPTS="-Xms256m -Xmx512m"
 
 ENTRYPOINT ["/app/entrypoint.sh"]
+
